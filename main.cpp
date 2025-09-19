@@ -176,31 +176,47 @@ int main() {
             }
         }
 
-        // 条件3: 2マス先まで木が無い方向に配置
+        // 条件3: 新たな確認済み空きマスが増える方向を遮断
         for (int dir = 0; dir < 4; ++dir) {
-            bool has_near_tree = false;
-            for (int step = 1; step <= 2; ++step) {
-                int ni = pi + di[dir] * step;
-                int nj = pj + dj[dir] * step;
+            int ni = pi;
+            int nj = pj;
+            bool will_increase = false;
+            int max_place_step = 0;
+            for (int step = 1;; ++step) {
+                ni += di[dir];
+                nj += dj[dir];
                 if (!inside(ni, nj)) {
-                    has_near_tree = true;
                     break;
                 }
                 if (is_tree[ni][nj]) {
-                    has_near_tree = true;
                     break;
                 }
+                max_place_step = step;
+                if (!confirmed[ni][nj]) {
+                    will_increase = true;
+                }
             }
-            if (has_near_tree) {
+            if (!will_increase) {
                 continue;
             }
-            for (int step = 1; step <= 2; ++step) {
-                int ni = pi + di[dir] * step;
-                int nj = pj + dj[dir] * step;
-                if (!inside(ni, nj)) {
-                    continue;
+
+            auto try_step = [&](int step) -> bool {
+                if (step <= 0 || step > max_place_step) {
+                    return false;
                 }
-                if (attempt_place(ni, nj)) {
+                int target_i = pi + di[dir] * step;
+                int target_j = pj + dj[dir] * step;
+                return attempt_place(target_i, target_j);
+            };
+
+            if (try_step(2)) {
+                continue;
+            }
+            if (try_step(1)) {
+                continue;
+            }
+            for (int step = 3; step <= max_place_step; ++step) {
+                if (try_step(step)) {
                     break;
                 }
             }
