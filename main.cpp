@@ -163,6 +163,36 @@ struct Solver {
         return path;
     }
 
+    std::vector<std::vector<int>> bfsDistance(int sx, int sy) const {
+        std::vector<std::vector<int>> dist(N, std::vector<int>(N, -1));
+        if (!inside(sx, sy) || board[sx][sy] != '.') {
+            return dist;
+        }
+        std::queue<std::pair<int, int>> q;
+        q.emplace(sx, sy);
+        dist[sx][sy] = 0;
+        while (!q.empty()) {
+            auto [x, y] = q.front();
+            q.pop();
+            for (int dir = 0; dir < 4; ++dir) {
+                int nx = x + dx[dir];
+                int ny = y + dy[dir];
+                if (!inside(nx, ny)) {
+                    continue;
+                }
+                if (board[nx][ny] != '.') {
+                    continue;
+                }
+                if (dist[nx][ny] != -1) {
+                    continue;
+                }
+                dist[nx][ny] = dist[x][y] + 1;
+                q.emplace(nx, ny);
+            }
+        }
+        return dist;
+    }
+
     bool frontConeClear(int dir, int dist, int pi, int pj) const {
         if (dist <= 0) {
             return false;
@@ -446,17 +476,57 @@ struct Solver {
         auto allowAll = [this](int x, int y) {
             return board[x][y] == '.';
         };
-        auto allowFar = [this](int x, int y) {
+        auto allowFar2 = [this](int x, int y) {
+            if (board[x][y] != '.') {
+                return false;
+            }
+            return manhattanDistance(x, y, ti, tj) >= 2;
+        };
+        auto allowFar5 = [this](int x, int y) {
             if (board[x][y] != '.') {
                 return false;
             }
             return manhattanDistance(x, y, ti, tj) >= 5;
         };
 
+        auto findNearestOpen = [this](int sx, int sy) {
+            std::queue<std::pair<int, int>> q;
+            std::vector<std::vector<bool>> visited(N, std::vector<bool>(N, false));
+            if (inside(sx, sy) && board[sx][sy] == '.') {
+                return std::make_pair(sx, sy);
+            }
+            if (inside(sx, sy) && !visited[sx][sy]) {
+                visited[sx][sy] = true;
+                q.emplace(sx, sy);
+            }
+            while (!q.empty()) {
+                auto [x, y] = q.front();
+                q.pop();
+                for (int dir = 0; dir < 4; ++dir) {
+                    int nx = x + dx[dir];
+                    int ny = y + dy[dir];
+                    if (!inside(nx, ny) || visited[nx][ny]) {
+                        continue;
+                    }
+                    visited[nx][ny] = true;
+                    if (board[nx][ny] == '.') {
+                        return std::make_pair(nx, ny);
+                    }
+                    q.emplace(nx, ny);
+                }
+            }
+            return std::make_pair(-1, -1);
+        };
+
+        auto [sx, sy] = findNearestOpen(0, 0);
+        auto [tx2, ty2] = findNearestOpen(N - 1, N - 1);
+        if (sx == -1 || tx2 == -1) {
+            return;
+        }
+
         int bottomRow = N - 1;
         int bestJ = -1;
         int bestDiff = N + 1;
-        std::vector<std::pair<int, int>> bestPathEntranceToBottom;
         for (int j = 0; j < N; ++j) {
             if (board[bottomRow][j] != '.') {
                 continue;
@@ -464,7 +534,7 @@ struct Solver {
             if (manhattanDistance(bottomRow, j, ti, tj) < 5) {
                 continue;
             }
-            auto path = shortestPath(si, sj, bottomRow, j, allowFar);
+            auto path = shortestPath(si, sj, bottomRow, j, allowFar5);
             if (path.empty()) {
                 continue;
             }
@@ -472,33 +542,50 @@ struct Solver {
             if (bestJ == -1 || diff < bestDiff || (diff == bestDiff && j < bestJ)) {
                 bestJ = j;
                 bestDiff = diff;
-                bestPathEntranceToBottom = std::move(path);
             }
         }
         if (bestJ == -1) {
             return;
         }
-        auto pathStartToEntrance = shortestPath(0, 0, si, sj, allowAll);
+        auto pathStartToEntrance = shortestPath(sx, sy, si, sj, allowAll);
         if (pathStartToEntrance.empty()) {
             return;
         }
-        auto pathBottomToGoal = shortestPath(bottomRow, bestJ, bottomRow, N - 1, allowAll);
+        auto pathMiddle = shortestPath(si, sj, bottomRow, bestJ, allowFar2);
+        if (pathMiddle.empty()) {
+            return;
+        }
+        auto pathBottomToGoal = shortestPath(bottomRow, bestJ, tx2, ty2, allowAll);
         if (pathBottomToGoal.empty()) {
             return;
         }
 
-        std::vector<std::pair<int, int>> fullPath = pathStartToEntrance;
-        if (bestPathEntranceToBottom.size() > 1) {
-            fullPath.insert(fullPath.end(), bestPathEntranceToBottom.begin() + 1, bestPathEntranceToBottom.end());
-        }
-        if (pathBottomToGoal.size() > 1) {
-            fullPath.insert(fullPath.end(), pathBottomToGoal.begin() + 1, pathBottomToGoal.end());
-        }
         std::vector<std::vector<bool>> onPath(N, std::vector<bool>(N, false));
-        for (auto [x, y] : fullPath) {
+        for (auto [x, y] : pathMiddle) {
             onPath[x][y] = true;
         }
-        for (auto [vx, vy] : bestPathEntranceToBottom) {
+
+        auto distFromS = bfsDistance(sx, sy);
+        auto distToEntrance = bfsDistance(si, sj);
+        auto distFromExit = bfsDistance(bottomRow, bestJ);
+        auto distToT = bfsDistance(tx2, ty2);
+
+        auto affectShortest = [&](int x, int y) {
+            bool critical = false;
+            if (distFromS[si][sj] != -1 && distFromS[x][y] != -1 && distToEntrance[x][y] != -1) {
+                if (distFromS[x][y] + distToEntrance[x][y] == distFromS[si][sj]) {
+                    critical = true;
+                }
+            }
+            if (distFromExit[tx2][ty2] != -1 && distFromExit[x][y] != -1 && distToT[x][y] != -1) {
+                if (distFromExit[x][y] + distToT[x][y] == distFromExit[tx2][ty2]) {
+                    critical = true;
+                }
+            }
+            return critical;
+        };
+
+        for (auto [vx, vy] : pathMiddle) {
             for (int dir = 0; dir < 4; ++dir) {
                 int nx = vx + dx[dir];
                 int ny = vy + dy[dir];
@@ -506,6 +593,9 @@ struct Solver {
                     continue;
                 }
                 if (onPath[nx][ny]) {
+                    continue;
+                }
+                if (affectShortest(nx, ny)) {
                     continue;
                 }
                 tryPlace(nx, ny, pi, pj, placements);
