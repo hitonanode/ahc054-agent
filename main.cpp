@@ -149,7 +149,7 @@ int main() {
         };
 
         auto place_near_clear = [&](int dir) -> bool {
-            for (int step = 1; step <= 3; ++step) {
+            for (int step = 2; step <= 3; ++step) {
                 int target_i = pi + di[dir] * step;
                 int target_j = pj + dj[dir] * step;
                 if (!inside(target_i, target_j)) {
