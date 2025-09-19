@@ -1,7 +1,8 @@
-#include <iostream>
-#include <vector>
-#include <queue>
+#include <algorithm>
 #include <array>
+#include <iostream>
+#include <queue>
+#include <vector>
 
 struct Position {
     int i;
@@ -147,6 +148,58 @@ int main() {
             return false;
         };
 
+        auto place_near_clear = [&](int dir) -> bool {
+            for (int step = 1; step <= 3; ++step) {
+                int target_i = pi + di[dir] * step;
+                int target_j = pj + dj[dir] * step;
+                if (!inside(target_i, target_j)) {
+                    continue;
+                }
+                if (is_tree[target_i][target_j]) {
+                    break;
+                }
+                std::vector<std::pair<int, bool>> neighbors;
+                neighbors.reserve(8);
+                for (int ddi = -1; ddi <= 1; ++ddi) {
+                    for (int ddj = -1; ddj <= 1; ++ddj) {
+                        if (ddi == 0 && ddj == 0) {
+                            continue;
+                        }
+                        int ni2 = target_i + ddi;
+                        int nj2 = target_j + ddj;
+                        int dist = std::abs(ni2 - pi) + std::abs(nj2 - pj);
+                        bool blocked = true;
+                        if (inside(ni2, nj2)) {
+                            blocked = is_tree[ni2][nj2];
+                        }
+                        neighbors.emplace_back(dist, blocked);
+                    }
+                }
+                std::sort(neighbors.begin(), neighbors.end(), [](const auto &a, const auto &b) {
+                    return a.first < b.first;
+                });
+                bool ok = true;
+                int checked = 0;
+                for (const auto &nb : neighbors) {
+                    if (checked >= 3) {
+                        break;
+                    }
+                    if (nb.second) {
+                        ok = false;
+                        break;
+                    }
+                    ++checked;
+                }
+                if (!ok) {
+                    continue;
+                }
+                if (attempt_place(target_i, target_j)) {
+                    return true;
+                }
+            }
+            return false;
+        };
+
         // 条件1: 次の移動でAAに隣接し得る場合を遮断
         for (int dir = 0; dir < 4; ++dir) {
             int ni = pi + di[dir];
@@ -218,14 +271,20 @@ int main() {
         if (unexplored_count == 3) {
             std::array<bool, 4> handled{};
             for (int dir = 0; dir < 4; ++dir) {
-                if (!neighbor_unexplored[dir]) {
+                if (!neighbor_unexplored[dir] || handled[dir]) {
                     continue;
                 }
                 int opp = opposite[dir];
-                if (neighbor_unexplored[opp]) {
-                    fill_direction(dir, 2, true);
+                if (neighbor_unexplored[opp] && !handled[opp]) {
+                    bool placed_dir = place_near_clear(dir);
+                    if (!placed_dir) {
+                        fill_direction(dir, 2, true);
+                    }
                     handled[dir] = true;
-                    fill_direction(opp, 2, true);
+                    bool placed_opp = place_near_clear(opp);
+                    if (!placed_opp) {
+                        fill_direction(opp, 2, true);
+                    }
                     handled[opp] = true;
                     break;
                 }
@@ -240,14 +299,20 @@ int main() {
                 if (!neighbor_unexplored[dir]) {
                     continue;
                 }
-                fill_direction(dir, 2, true);
+                bool placed = place_near_clear(dir);
+                if (!placed) {
+                    fill_direction(dir, 2, true);
+                }
             }
         } else if (unexplored_count == 1) {
             for (int dir = 0; dir < 4; ++dir) {
                 if (!neighbor_unexplored[dir]) {
                     continue;
                 }
-                fill_direction(dir, 3, true);
+                bool placed = place_near_clear(dir);
+                if (!placed) {
+                    fill_direction(dir, 3, true);
+                }
             }
         }
 
