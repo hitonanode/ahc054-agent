@@ -35,7 +35,7 @@ struct Solver {
         return 0 <= x && x < N && 0 <= y && y < N;
     }
 
-    bool hasPath() const {
+    bool maintainsConnectivity() const {
         if (board[si][sj] != '.') {
             return false;
         }
@@ -46,9 +46,6 @@ struct Solver {
         while (!q.empty()) {
             auto [x, y] = q.front();
             q.pop();
-            if (x == ti && y == tj) {
-                return true;
-            }
             for (int dir = 0; dir < 4; ++dir) {
                 int nx = x + dx[dir];
                 int ny = y + dy[dir];
@@ -65,7 +62,17 @@ struct Solver {
                 q.emplace(nx, ny);
             }
         }
-        return false;
+        if (!visited[ti][tj]) {
+            return false;
+        }
+        for (int i = 0; i < N; ++i) {
+            for (int j = 0; j < N; ++j) {
+                if (board[i][j] == '.' && !visited[i][j]) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     bool canPlace(int x, int y, int pi, int pj) const {
@@ -92,7 +99,7 @@ struct Solver {
             return false;
         }
         board[x][y] = 'T';
-        if (!hasPath()) {
+        if (!maintainsConnectivity()) {
             board[x][y] = '.';
             return false;
         }
