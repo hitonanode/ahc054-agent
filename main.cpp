@@ -22,9 +22,7 @@ struct Solver {
     void init() {
         std::cin >> N >> ti >> tj;
         initial.resize(N);
-        for (int i = 0; i < N; ++i) {
-            std::cin >> initial[i];
-        }
+        for (int i = 0; i < N; ++i) { std::cin >> initial[i]; }
         board = initial;
         confirmed.assign(N, std::vector<bool>(N, false));
         si = 0;
@@ -32,18 +30,14 @@ struct Solver {
         confirmed[si][sj] = true;
     }
 
-    bool inside(int x, int y) const {
-        return 0 <= x && x < N && 0 <= y && y < N;
-    }
+    bool inside(int x, int y) const { return 0 <= x && x < N && 0 <= y && y < N; }
 
     int manhattanDistance(int x1, int y1, int x2, int y2) const {
         return std::abs(x1 - x2) + std::abs(y1 - y2);
     }
 
     bool hasPathToFlower() const {
-        if (board[si][sj] != '.') {
-            return false;
-        }
+        if (board[si][sj] != '.') { return false; }
         std::queue<std::pair<int, int>> q;
         std::vector<std::vector<bool>> visited(N, std::vector<bool>(N, false));
         visited[si][sj] = true;
@@ -51,21 +45,13 @@ struct Solver {
         while (!q.empty()) {
             auto [x, y] = q.front();
             q.pop();
-            if (x == ti && y == tj) {
-                return true;
-            }
+            if (x == ti && y == tj) { return true; }
             for (int dir = 0; dir < 4; ++dir) {
                 int nx = x + dx[dir];
                 int ny = y + dy[dir];
-                if (!inside(nx, ny)) {
-                    continue;
-                }
-                if (visited[nx][ny]) {
-                    continue;
-                }
-                if (board[nx][ny] != '.') {
-                    continue;
-                }
+                if (!inside(nx, ny)) { continue; }
+                if (visited[nx][ny]) { continue; }
+                if (board[nx][ny] != '.') { continue; }
                 visited[nx][ny] = true;
                 q.emplace(nx, ny);
             }
@@ -74,32 +60,20 @@ struct Solver {
     }
 
     bool canPlace(int x, int y, int pi, int pj) const {
-        if (!inside(x, y)) {
-            return false;
-        }
-        if (confirmed[x][y]) {
-            return false;
-        }
-        if (board[x][y] != '.') {
-            return false;
-        }
-        if (x == pi && y == pj) {
-            return false;
-        }
-        if (x == ti && y == tj) {
-            return false;
-        }
+        if (!inside(x, y)) { return false; }
+        if (confirmed[x][y]) { return false; }
+        if (board[x][y] != '.') { return false; }
+        if (x == pi && y == pj) { return false; }
+        if (x == ti && y == tj) { return false; }
         return true;
     }
 
-    std::vector<std::vector<bool>> computeNeedsAvoidingNear() const {
+    template <int THRESHOLD> std::vector<std::vector<bool>> computeNeedsAvoidingNear() const {
         std::vector<std::vector<bool>> needs(N, std::vector<bool>(N, false));
-        if (board[si][sj] != '.') {
-            return needs;
-        }
+        if (board[si][sj] != '.') { return needs; }
         std::queue<std::pair<int, int>> q;
         std::vector<std::vector<bool>> visited(N, std::vector<bool>(N, false));
-        if (manhattanDistance(si, sj, ti, tj) > 2) {
+        if (manhattanDistance(si, sj, ti, tj) > THRESHOLD) {
             q.emplace(si, sj);
             visited[si][sj] = true;
         }
@@ -109,25 +83,18 @@ struct Solver {
             for (int dir = 0; dir < 4; ++dir) {
                 int nx = x + dx[dir];
                 int ny = y + dy[dir];
-                if (!inside(nx, ny)) {
-                    continue;
-                }
-                if (visited[nx][ny]) {
-                    continue;
-                }
-                if (board[nx][ny] != '.') {
-                    continue;
-                }
-                if (manhattanDistance(nx, ny, ti, tj) <= 2) {
-                    continue;
-                }
+                if (!inside(nx, ny)) { continue; }
+                if (visited[nx][ny]) { continue; }
+                if (board[nx][ny] != '.') { continue; }
+                if (manhattanDistance(nx, ny, ti, tj) <= THRESHOLD) { continue; }
                 visited[nx][ny] = true;
                 q.emplace(nx, ny);
             }
         }
         for (int i = 0; i < N; ++i) {
             for (int j = 0; j < N; ++j) {
-                if (board[i][j] == '.' && manhattanDistance(i, j, ti, tj) > 2 && !visited[i][j]) {
+                if (board[i][j] == '.' && manhattanDistance(i, j, ti, tj) > THRESHOLD &&
+                    !visited[i][j]) {
                     needs[i][j] = true;
                 }
             }
@@ -135,21 +102,18 @@ struct Solver {
         return needs;
     }
 
-    bool tryPlace(int x, int y, int pi, int pj, std::vector<std::pair<int, int>> &placements, bool highPriority = false) {
-        if (!canPlace(x, y, pi, pj)) {
-            return false;
-        }
+    bool tryPlace(int x, int y, int pi, int pj, std::vector<std::pair<int, int>> &placements,
+                  bool highPriority = false) {
+        if (!canPlace(x, y, pi, pj)) { return false; }
         std::vector<std::vector<bool>> beforeNeeds;
-        if (!highPriority) {
-            beforeNeeds = computeNeedsAvoidingNear();
-        }
+        if (!highPriority) { beforeNeeds = computeNeedsAvoidingNear<2>(); }
         board[x][y] = 'T';
         if (!hasPathToFlower()) {
             board[x][y] = '.';
             return false;
         }
         if (!highPriority) {
-            auto afterNeeds = computeNeedsAvoidingNear();
+            auto afterNeeds = computeNeedsAvoidingNear<2>();
             for (int i = 0; i < N; ++i) {
                 for (int j = 0; j < N; ++j) {
                     if (afterNeeds[i][j] && !beforeNeeds[i][j]) {
@@ -164,42 +128,30 @@ struct Solver {
     }
 
     template <class Predicate>
-    std::vector<std::pair<int, int>> shortestPath(int sx, int sy, int gx, int gy, Predicate allow) const {
-        if (!inside(sx, sy) || !inside(gx, gy)) {
-            return {};
-        }
-        if (!allow(sx, sy) || !allow(gx, gy)) {
-            return {};
-        }
+    std::vector<std::pair<int, int>>
+    shortestPath(int sx, int sy, int gx, int gy, Predicate allow) const {
+        if (!inside(sx, sy) || !inside(gx, gy)) { return {}; }
+        if (!allow(sx, sy) || !allow(gx, gy)) { return {}; }
         std::queue<std::pair<int, int>> q;
-        std::vector<std::vector<std::pair<int, int>>> parent(N, std::vector<std::pair<int, int>>(N, {-1, -1}));
+        std::vector<std::vector<std::pair<int, int>>> parent(
+            N, std::vector<std::pair<int, int>>(N, {-1, -1}));
         parent[sx][sy] = {sx, sy};
         q.emplace(sx, sy);
         while (!q.empty()) {
             auto [x, y] = q.front();
             q.pop();
-            if (x == gx && y == gy) {
-                break;
-            }
+            if (x == gx && y == gy) { break; }
             for (int dir = 0; dir < 4; ++dir) {
                 int nx = x + dx[dir];
                 int ny = y + dy[dir];
-                if (!inside(nx, ny)) {
-                    continue;
-                }
-                if (!allow(nx, ny)) {
-                    continue;
-                }
-                if (parent[nx][ny].first != -1) {
-                    continue;
-                }
+                if (!inside(nx, ny)) { continue; }
+                if (!allow(nx, ny)) { continue; }
+                if (parent[nx][ny].first != -1) { continue; }
                 parent[nx][ny] = {x, y};
                 q.emplace(nx, ny);
             }
         }
-        if (parent[gx][gy].first == -1) {
-            return {};
-        }
+        if (parent[gx][gy].first == -1) { return {}; }
         std::vector<std::pair<int, int>> path;
         int cx = gx;
         int cy = gy;
@@ -219,40 +171,24 @@ struct Solver {
         if (pi == tx) {
             int step = (ty > pj) ? 1 : -1;
             for (int y = pj + step; y != ty; y += step) {
-                if (board[pi][y] == 'T') {
-                    return;
-                }
+                if (board[pi][y] == 'T') { return; }
             }
             std::vector<std::pair<int, int>> candidates;
-            for (int y = pj + step; y != ty; y += step) {
-                candidates.emplace_back(pi, y);
-            }
-            if (targetPriority) {
-                std::reverse(candidates.begin(), candidates.end());
-            }
+            for (int y = pj + step; y != ty; y += step) { candidates.emplace_back(pi, y); }
+            if (targetPriority) { std::reverse(candidates.begin(), candidates.end()); }
             for (auto [cx, cy] : candidates) {
-                if (tryPlace(cx, cy, pi, pj, placements, targetPriority)) {
-                    return;
-                }
+                if (tryPlace(cx, cy, pi, pj, placements, targetPriority)) { return; }
             }
         } else if (pj == ty) {
             int step = (tx > pi) ? 1 : -1;
             for (int x = pi + step; x != tx; x += step) {
-                if (board[x][pj] == 'T') {
-                    return;
-                }
+                if (board[x][pj] == 'T') { return; }
             }
             std::vector<std::pair<int, int>> candidates;
-            for (int x = pi + step; x != tx; x += step) {
-                candidates.emplace_back(x, pj);
-            }
-            if (targetPriority) {
-                std::reverse(candidates.begin(), candidates.end());
-            }
+            for (int x = pi + step; x != tx; x += step) { candidates.emplace_back(x, pj); }
+            if (targetPriority) { std::reverse(candidates.begin(), candidates.end()); }
             for (auto [cx, cy] : candidates) {
-                if (tryPlace(cx, cy, pi, pj, placements, targetPriority)) {
-                    return;
-                }
+                if (tryPlace(cx, cy, pi, pj, placements, targetPriority)) { return; }
             }
         }
     }
@@ -262,39 +198,43 @@ struct Solver {
         for (int dir = 0; dir < 4; ++dir) {
             int nx = pi + dx[dir];
             int ny = pj + dy[dir];
-            if (!inside(nx, ny)) {
-                continue;
-            }
-            if (board[nx][ny] != '.') {
-                continue;
-            }
-            if (confirmed[nx][ny]) {
-                continue;
-            }
-            if (manhattanDistance(nx, ny, ti, tj) == 1) {
-                candidates.emplace_back(nx, ny);
-            }
+            if (!inside(nx, ny)) { continue; }
+            if (board[nx][ny] != '.') { continue; }
+            if (confirmed[nx][ny]) { continue; }
+            if (manhattanDistance(nx, ny, ti, tj) == 1) { candidates.emplace_back(nx, ny); }
         }
         std::sort(candidates.begin(), candidates.end(), [&](const auto &a, const auto &b) {
             int da = manhattanDistance(a.first, a.second, ti, tj);
             int db = manhattanDistance(b.first, b.second, ti, tj);
-            if (da != db) {
-                return da < db;
-            }
+            if (da != db) { return da < db; }
             return a < b;
         });
-        for (auto [nx, ny] : candidates) {
-            tryPlace(nx, ny, pi, pj, placements, true);
+        for (auto [nx, ny] : candidates) { tryPlace(nx, ny, pi, pj, placements, true); }
+    }
+
+    void blockShortPathToFlower(int pi, int pj, std::vector<std::pair<int, int>> &placements) {
+        while (true) {
+            auto path = shortestPathOpen(ti, tj, pi, pj);
+            if (path.empty()) { return; }
+            int dist = static_cast<int>(path.size()) - 1;
+            if (dist <= 0 || dist > 3) { return; }
+            bool upd = false;
+            for (size_t idx = 1; idx + 1 < path.size(); ++idx) {
+                int x = path[idx].first;
+                int y = path[idx].second;
+                if (tryPlace(x, y, pi, pj, placements, true)) {
+                    upd = true;
+                    break;
+                }
+            }
+
+            if (!upd) { return; }
         }
     }
 
     int shortestDistance(int sx, int sy, int gx, int gy) const {
-        if (!inside(sx, sy) || !inside(gx, gy)) {
-            return -1;
-        }
-        if (board[sx][sy] != '.' || board[gx][gy] != '.') {
-            return -1;
-        }
+        if (!inside(sx, sy) || !inside(gx, gy)) { return -1; }
+        if (board[sx][sy] != '.' || board[gx][gy] != '.') { return -1; }
         std::queue<std::pair<int, int>> q;
         std::vector<std::vector<int>> dist(N, std::vector<int>(N, -1));
         dist[sx][sy] = 0;
@@ -302,21 +242,13 @@ struct Solver {
         while (!q.empty()) {
             auto [x, y] = q.front();
             q.pop();
-            if (x == gx && y == gy) {
-                return dist[x][y];
-            }
+            if (x == gx && y == gy) { return dist[x][y]; }
             for (int dir = 0; dir < 4; ++dir) {
                 int nx = x + dx[dir];
                 int ny = y + dy[dir];
-                if (!inside(nx, ny)) {
-                    continue;
-                }
-                if (board[nx][ny] != '.') {
-                    continue;
-                }
-                if (dist[nx][ny] != -1) {
-                    continue;
-                }
+                if (!inside(nx, ny)) { continue; }
+                if (board[nx][ny] != '.') { continue; }
+                if (dist[nx][ny] != -1) { continue; }
                 dist[nx][ny] = dist[x][y] + 1;
                 q.emplace(nx, ny);
             }
@@ -324,109 +256,74 @@ struct Solver {
         return -1;
     }
 
+    std::vector<std::pair<int, int>> shortestPathOpen(int sx, int sy, int gx, int gy) const {
+        auto allow = [this](int x, int y) { return inside(x, y) && board[x][y] == '.'; };
+        return shortestPath(sx, sy, gx, gy, allow);
+    }
+
     bool frontConeClear(int dir, int dist, int pi, int pj) const {
-        if (dist <= 0) {
-            return false;
-        }
+        if (dist <= 0) { return false; }
         int baseX = pi + dx[dir] * (dist - 1);
         int baseY = pj + dy[dir] * (dist - 1);
         if (dir < 2) { // vertical
             for (int deltaY = -1; deltaY <= 1; ++deltaY) {
                 int nx = baseX;
                 int ny = baseY + deltaY;
-                if (!inside(nx, ny)) {
-                    return false;
-                }
-                if (board[nx][ny] == 'T') {
-                    return false;
-                }
+                if (!inside(nx, ny)) { return false; }
+                if (board[nx][ny] == 'T') { return false; }
             }
         } else { // horizontal
             for (int deltaX = -1; deltaX <= 1; ++deltaX) {
                 int nx = baseX + deltaX;
                 int ny = baseY;
-                if (!inside(nx, ny)) {
-                    return false;
-                }
-                if (board[nx][ny] == 'T') {
-                    return false;
-                }
+                if (!inside(nx, ny)) { return false; }
+                if (board[nx][ny] == 'T') { return false; }
             }
         }
         return true;
     }
 
-    void placeWithFrontPreference(int dir, int pi, int pj, std::vector<std::pair<int, int>> &placements,
-                                  const std::vector<int> &preferredDistances, int fallbackStart) {
+    void
+    placeWithFrontPreference(int dir, int pi, int pj, std::vector<std::pair<int, int>> &placements,
+                             const std::vector<int> &preferredDistances, int fallbackStart) {
         bool placed = false;
         for (int dist : preferredDistances) {
             int nx = pi + dx[dir] * dist;
             int ny = pj + dy[dir] * dist;
-            if (!inside(nx, ny)) {
-                break;
-            }
-            if (board[nx][ny] == 'T') {
-                break;
-            }
-            if (!canPlace(nx, ny, pi, pj)) {
-                continue;
-            }
-            if (!frontConeClear(dir, dist, pi, pj)) {
-                continue;
-            }
+            if (!inside(nx, ny)) { break; }
+            if (board[nx][ny] == 'T') { break; }
+            if (!canPlace(nx, ny, pi, pj)) { continue; }
+            if (!frontConeClear(dir, dist, pi, pj)) { continue; }
             if (tryPlace(nx, ny, pi, pj, placements)) {
                 placed = true;
                 break;
             }
         }
-        if (placed) {
-            return;
-        }
+        if (placed) { return; }
         for (int dist = fallbackStart;; ++dist) {
             int nx = pi + dx[dir] * dist;
             int ny = pj + dy[dir] * dist;
-            if (!inside(nx, ny)) {
-                break;
-            }
-            if (board[nx][ny] == 'T') {
-                break;
-            }
-            if (!canPlace(nx, ny, pi, pj)) {
-                continue;
-            }
-            if (tryPlace(nx, ny, pi, pj, placements)) {
-                break;
-            }
+            if (!inside(nx, ny)) { break; }
+            if (board[nx][ny] == 'T') { break; }
+            if (!canPlace(nx, ny, pi, pj)) { continue; }
+            if (tryPlace(nx, ny, pi, pj, placements)) { break; }
         }
     }
 
-    void handleConfirmedFront(int dir, int pi, int pj, std::vector<std::pair<int, int>> &placements) {
+    void
+    handleConfirmedFront(int dir, int pi, int pj, std::vector<std::pair<int, int>> &placements) {
         int adjX = pi + dx[dir];
         int adjY = pj + dy[dir];
-        if (!inside(adjX, adjY)) {
-            return;
-        }
-        if (!confirmed[adjX][adjY]) {
-            return;
-        }
-        if (board[adjX][adjY] == 'T') {
-            return;
-        }
+        if (!inside(adjX, adjY)) { return; }
+        if (!confirmed[adjX][adjY]) { return; }
+        if (board[adjX][adjY] == 'T') { return; }
         for (int dist = 2;; ++dist) {
             int nx = pi + dx[dir] * dist;
             int ny = pj + dy[dir] * dist;
-            if (!inside(nx, ny)) {
-                break;
-            }
-            if (board[nx][ny] == 'T') {
-                break;
-            }
-            if (confirmed[nx][ny]) {
-                continue;
-            }
-            if (tryPlace(nx, ny, pi, pj, placements)) {
-                break;
-            }
+            if (!inside(nx, ny)) { break; }
+            if (board[nx][ny] == 'T') { break; }
+            if (confirmed[nx][ny]) { continue; }
+            if (tryPlace(nx, ny, pi, pj, placements)) { break; }
         }
     }
 
@@ -438,19 +335,14 @@ struct Solver {
         for (int dir = 0; dir < 4; ++dir) {
             int ax = ti + dx[dir];
             int ay = tj + dy[dir];
-            if (!inside(ax, ay)) {
-                continue;
-            }
-            if (board[ax][ay] == 'T') {
-                continue;
-            }
-            if (pi == ax || pj == ay) {
-                blockStraightPath(pi, pj, ax, ay, true, placements);
-            }
+            if (!inside(ax, ay)) { continue; }
+            if (board[ax][ay] == 'T') { continue; }
+            if (pi == ax || pj == ay) { blockStraightPath(pi, pj, ax, ay, true, placements); }
         }
     }
 
-    void handleFlowerRemainingDirection(int pi, int pj, std::vector<std::pair<int, int>> &placements) {
+    void
+    handleFlowerRemainingDirection(int pi, int pj, std::vector<std::pair<int, int>> &placements) {
         int treeCount = 0;
         int remainingDir = -1;
         for (int dir = 0; dir < 4; ++dir) {
@@ -474,15 +366,9 @@ struct Solver {
             for (int dist = 1;; ++dist) {
                 int nx = ti + dx[remainingDir] * dist;
                 int ny = tj + dy[remainingDir] * dist;
-                if (!inside(nx, ny)) {
-                    break;
-                }
-                if (board[nx][ny] == 'T') {
-                    break;
-                }
-                if (tryPlace(nx, ny, pi, pj, placements, true)) {
-                    break;
-                }
+                if (!inside(nx, ny)) { break; }
+                if (board[nx][ny] == 'T') { break; }
+                if (tryPlace(nx, ny, pi, pj, placements, true)) { break; }
             }
         }
     }
@@ -492,53 +378,34 @@ struct Solver {
         for (int dir = 0; dir < 4; ++dir) {
             int nx = pi + dx[dir];
             int ny = pj + dy[dir];
-            if (!inside(nx, ny)) {
-                continue;
-            }
-            if (board[nx][ny] != '.') {
-                continue;
-            }
-            if (confirmed[nx][ny]) {
-                continue;
-            }
-            if (std::abs(nx - ti) + std::abs(ny - tj) == 1) {
-                candidates.emplace_back(nx, ny);
-            }
+            if (!inside(nx, ny)) { continue; }
+            if (board[nx][ny] != '.') { continue; }
+            if (confirmed[nx][ny]) { continue; }
+            if (std::abs(nx - ti) + std::abs(ny - tj) == 1) { candidates.emplace_back(nx, ny); }
         }
         std::sort(candidates.begin(), candidates.end(), [&](const auto &a, const auto &b) {
             int da = manhattanDistance(a.first, a.second, ti, tj);
             int db = manhattanDistance(b.first, b.second, ti, tj);
-            if (da != db) {
-                return da < db;
-            }
+            if (da != db) { return da < db; }
             return a < b;
         });
         for (auto [nx, ny] : candidates) {
-            if (tryPlace(nx, ny, pi, pj, placements)) {
-                break;
-            }
+            if (tryPlace(nx, ny, pi, pj, placements)) { break; }
         }
     }
 
     void handleAdjacentSquares(int pi, int pj, std::vector<std::pair<int, int>> &placements) {
         const std::array<std::pair<int, int>, 4> squares{
-            std::make_pair(pi - 1, pj - 1),
-            std::make_pair(pi - 1, pj),
-            std::make_pair(pi, pj - 1),
-            std::make_pair(pi, pj)
-        };
+            std::make_pair(pi - 1, pj - 1), std::make_pair(pi - 1, pj), std::make_pair(pi, pj - 1),
+            std::make_pair(pi, pj)};
         for (auto [sx, sy] : squares) {
             int ex = sx + 1;
             int ey = sy + 1;
             if (!(inside(sx, sy) && inside(ex, sy) && inside(sx, ey) && inside(ex, ey))) {
                 continue;
             }
-            std::array<std::pair<int, int>, 4> cells{
-                std::make_pair(sx, sy),
-                std::make_pair(ex, sy),
-                std::make_pair(sx, ey),
-                std::make_pair(ex, ey)
-            };
+            std::array<std::pair<int, int>, 4> cells{std::make_pair(sx, sy), std::make_pair(ex, sy),
+                                                     std::make_pair(sx, ey), std::make_pair(ex, ey)};
             bool allOpen = true;
             bool allConfirmedNow = true;
             for (auto [cx, cy] : cells) {
@@ -546,29 +413,17 @@ struct Solver {
                     allOpen = false;
                     break;
                 }
-                if (!confirmed[cx][cy]) {
-                    allConfirmedNow = false;
-                }
+                if (!confirmed[cx][cy]) { allConfirmedNow = false; }
             }
-            if (!allOpen || allConfirmedNow) {
-                continue;
-            }
+            if (!allOpen || allConfirmedNow) { continue; }
             bool placed = false;
             for (int dir = 0; dir < 4; ++dir) {
                 int nx = pi + dx[dir];
                 int ny = pj + dy[dir];
-                if (!inside(nx, ny)) {
-                    continue;
-                }
-                if (nx < sx || nx > ex || ny < sy || ny > ey) {
-                    continue;
-                }
-                if (confirmed[nx][ny]) {
-                    continue;
-                }
-                if (board[nx][ny] != '.') {
-                    continue;
-                }
+                if (!inside(nx, ny)) { continue; }
+                if (nx < sx || nx > ex || ny < sy || ny > ey) { continue; }
+                if (confirmed[nx][ny]) { continue; }
+                if (board[nx][ny] != '.') { continue; }
                 if (tryPlace(nx, ny, pi, pj, placements)) {
                     placed = true;
                     break;
@@ -579,28 +434,20 @@ struct Solver {
     }
 
     void preprocessInitial(int pi, int pj, std::vector<std::pair<int, int>> &placements) {
-        auto allowAll = [this](int x, int y) {
-            return board[x][y] == '.';
-        };
+        auto allowAll = [this](int x, int y) { return board[x][y] == '.'; };
         auto allowFar2 = [this](int x, int y) {
-            if (board[x][y] != '.') {
-                return false;
-            }
+            if (board[x][y] != '.') { return false; }
             return manhattanDistance(x, y, ti, tj) >= 2;
         };
         auto allowFar5 = [this](int x, int y) {
-            if (board[x][y] != '.') {
-                return false;
-            }
+            if (board[x][y] != '.') { return false; }
             return manhattanDistance(x, y, ti, tj) >= 5;
         };
 
         auto findNearestOpen = [this](int sx, int sy) {
             std::queue<std::pair<int, int>> q;
             std::vector<std::vector<bool>> visited(N, std::vector<bool>(N, false));
-            if (inside(sx, sy) && board[sx][sy] == '.') {
-                return std::make_pair(sx, sy);
-            }
+            if (inside(sx, sy) && board[sx][sy] == '.') { return std::make_pair(sx, sy); }
             if (inside(sx, sy) && !visited[sx][sy]) {
                 visited[sx][sy] = true;
                 q.emplace(sx, sy);
@@ -611,13 +458,9 @@ struct Solver {
                 for (int dir = 0; dir < 4; ++dir) {
                     int nx = x + dx[dir];
                     int ny = y + dy[dir];
-                    if (!inside(nx, ny) || visited[nx][ny]) {
-                        continue;
-                    }
+                    if (!inside(nx, ny) || visited[nx][ny]) { continue; }
                     visited[nx][ny] = true;
-                    if (board[nx][ny] == '.') {
-                        return std::make_pair(nx, ny);
-                    }
+                    if (board[nx][ny] == '.') { return std::make_pair(nx, ny); }
                     q.emplace(nx, ny);
                 }
             }
@@ -636,16 +479,10 @@ struct Solver {
         int bestJ = -1;
         int bestDiff = N + 1;
         for (int j = 0; j < N; ++j) {
-            if (board[bottomRow][j] != '.') {
-                continue;
-            }
-            if (manhattanDistance(bottomRow, j, ti, tj) < 5) {
-                continue;
-            }
+            if (board[bottomRow][j] != '.') { continue; }
+            if (manhattanDistance(bottomRow, j, ti, tj) < 5) { continue; }
             auto path = shortestPath(si, sj, bottomRow, j, allowFar5);
-            if (path.empty()) {
-                continue;
-            }
+            if (path.empty()) { continue; }
             int diff = std::abs(j - sj);
             if (bestJ == -1 || diff < bestDiff || (diff == bestDiff && j < bestJ)) {
                 bestJ = j;
@@ -663,7 +500,7 @@ struct Solver {
             std::cerr << "pathStartToEntrance missing" << '\n';
             return;
         }
-        auto pathMiddle = shortestPath(si, sj, bottomRow, bestJ, allowFar2);
+        auto pathMiddle = shortestPath(si, sj, bottomRow, bestJ, allowFar5);
         std::cerr << "pathMiddle size=" << pathMiddle.size() << '\n';
         if (pathMiddle.empty()) {
             std::cerr << "pathMiddle missing" << '\n';
@@ -677,11 +514,10 @@ struct Solver {
         }
 
         std::vector<std::vector<bool>> onPath(N, std::vector<bool>(N, false));
-        for (auto [x, y] : pathMiddle) {
-            onPath[x][y] = true;
-        }
-        std::cerr << "pathMiddle first/last=" << pathMiddle.front().first << ',' << pathMiddle.front().second
-                  << " -> " << pathMiddle.back().first << ',' << pathMiddle.back().second << '\n';
+        for (auto [x, y] : pathMiddle) { onPath[x][y] = true; }
+        std::cerr << "pathMiddle first/last=" << pathMiddle.front().first << ','
+                  << pathMiddle.front().second << " -> " << pathMiddle.back().first << ','
+                  << pathMiddle.back().second << '\n';
 
         int baseStartDist = static_cast<int>(pathStartToEntrance.size()) - 1;
         int baseGoalDist = static_cast<int>(pathBottomToGoal.size()) - 1;
@@ -693,29 +529,34 @@ struct Solver {
                 int nx = vx + dx[dir];
                 int ny = vy + dy[dir];
                 if (!inside(nx, ny)) {
-                    std::cerr << "skip (" << nx << ',' << ny << ") reason=outside center=" << vx << ',' << vy << '\n';
+                    std::cerr << "skip (" << nx << ',' << ny << ") reason=outside center=" << vx
+                              << ',' << vy << '\n';
                     continue;
                 }
                 if (board[nx][ny] != '.') {
-                    std::cerr << "skip (" << nx << ',' << ny << ") reason=blocked cell center=" << vx << ',' << vy << '\n';
+                    std::cerr << "skip (" << nx << ',' << ny
+                              << ") reason=blocked cell center=" << vx << ',' << vy << '\n';
                     continue;
                 }
                 if (onPath[nx][ny]) {
-                    std::cerr << "skip (" << nx << ',' << ny << ") reason=onPath center=" << vx << ',' << vy << '\n';
+                    std::cerr << "skip (" << nx << ',' << ny << ") reason=onPath center=" << vx
+                              << ',' << vy << '\n';
                     continue;
                 }
                 board[nx][ny] = 'T';
                 int newStartDist = shortestDistance(sx, sy, si, sj);
                 int newGoalDist = shortestDistance(bottomRow, bestJ, tx2, ty2);
                 board[nx][ny] = '.';
-                if (newStartDist == -1 || newStartDist > baseStartDist ||
-                    newGoalDist == -1 || newGoalDist > baseGoalDist) {
-                    std::cerr << "skip (" << nx << ',' << ny << ") reason=path length center=" << vx << ',' << vy
+                if (newStartDist == -1 || newStartDist > baseStartDist || newGoalDist == -1 ||
+                    newGoalDist > baseGoalDist) {
+                    std::cerr << "skip (" << nx << ',' << ny
+                              << ") reason=path length center=" << vx << ',' << vy
                               << " newStart=" << newStartDist << " newGoal=" << newGoalDist << '\n';
                     continue;
                 }
-                if (!tryPlace(nx, ny, pi, pj, placements)) {
-                    std::cerr << "skip (" << nx << ',' << ny << ") reason=tryPlace reject center=" << vx << ',' << vy << '\n';
+                if (!tryPlace(nx, ny, pi, pj, placements, true)) {
+                    std::cerr << "skip (" << nx << ',' << ny
+                              << ") reason=tryPlace reject center=" << vx << ',' << vy << '\n';
                 }
             }
         }
@@ -728,6 +569,7 @@ struct Solver {
             preprocessed = true;
         }
         preventImmediateAdjacency(pi, pj, placements);
+        blockShortPathToFlower(pi, pj, placements);
         handleAdjacentToFlower(pi, pj, placements);
         handleAdjacentSquares(pi, pj, placements);
 
@@ -735,15 +577,9 @@ struct Solver {
         for (int dir = 0; dir < 4; ++dir) {
             int nx = pi + dx[dir];
             int ny = pj + dy[dir];
-            if (!inside(nx, ny)) {
-                continue;
-            }
-            if (board[nx][ny] != '.') {
-                continue;
-            }
-            if (confirmed[nx][ny]) {
-                continue;
-            }
+            if (!inside(nx, ny)) { continue; }
+            if (board[nx][ny] != '.') { continue; }
+            if (confirmed[nx][ny]) { continue; }
             availableDirs.push_back(dir);
         }
 
@@ -793,14 +629,10 @@ struct Solver {
             } else if (board[nx2][ny2] == 'T') {
                 blocked = true;
             }
-            if (!blocked) {
-                placeWithFrontPreference(dir, pi, pj, placements, {2, 3}, 3);
-            }
+            if (!blocked) { placeWithFrontPreference(dir, pi, pj, placements, {2, 3}, 3); }
         }
 
-        for (int dir = 0; dir < 4; ++dir) {
-            handleConfirmedFront(dir, pi, pj, placements);
-        }
+        for (int dir = 0; dir < 4; ++dir) { handleConfirmedFront(dir, pi, pj, placements); }
 
         blockLineToFlower(pi, pj, placements);
         blockLineToFlowerNeighbors(pi, pj, placements);
@@ -820,27 +652,19 @@ int main() {
     while (true) {
         int pi = 0;
         int pj = 0;
-        if (!(std::cin >> pi >> pj)) {
-            return 0;
-        }
+        if (!(std::cin >> pi >> pj)) { return 0; }
         int n = 0;
         std::cin >> n;
         for (int k = 0; k < n; ++k) {
             int x = 0;
             int y = 0;
             std::cin >> x >> y;
-            if (solver.inside(x, y)) {
-                solver.confirmed[x][y] = true;
-            }
+            if (solver.inside(x, y)) { solver.confirmed[x][y] = true; }
         }
-        if (pi == solver.ti && pj == solver.tj) {
-            break;
-        }
+        if (pi == solver.ti && pj == solver.tj) { break; }
         auto placements = solver.planTurn(pi, pj);
         std::cout << placements.size();
-        for (auto [x, y] : placements) {
-            std::cout << ' ' << x << ' ' << y;
-        }
+        for (auto [x, y] : placements) { std::cout << ' ' << x << ' ' << y; }
         std::cout << '\n';
         std::cout.flush();
     }
