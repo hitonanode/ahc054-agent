@@ -384,6 +384,64 @@ struct Solver {
         }
     }
 
+    void handleAdjacentSquares(int pi, int pj, std::vector<std::pair<int, int>> &placements) {
+        const std::array<std::pair<int, int>, 4> squares{
+            std::make_pair(pi - 1, pj - 1),
+            std::make_pair(pi - 1, pj),
+            std::make_pair(pi, pj - 1),
+            std::make_pair(pi, pj)
+        };
+        for (auto [sx, sy] : squares) {
+            int ex = sx + 1;
+            int ey = sy + 1;
+            if (!(inside(sx, sy) && inside(ex, sy) && inside(sx, ey) && inside(ex, ey))) {
+                continue;
+            }
+            std::array<std::pair<int, int>, 4> cells{
+                std::make_pair(sx, sy),
+                std::make_pair(ex, sy),
+                std::make_pair(sx, ey),
+                std::make_pair(ex, ey)
+            };
+            bool allOpen = true;
+            bool allConfirmedNow = true;
+            for (auto [cx, cy] : cells) {
+                if (board[cx][cy] != '.') {
+                    allOpen = false;
+                    break;
+                }
+                if (!confirmed[cx][cy]) {
+                    allConfirmedNow = false;
+                }
+            }
+            if (!allOpen || allConfirmedNow) {
+                continue;
+            }
+            bool placed = false;
+            for (int dir = 0; dir < 4; ++dir) {
+                int nx = pi + dx[dir];
+                int ny = pj + dy[dir];
+                if (!inside(nx, ny)) {
+                    continue;
+                }
+                if (nx < sx || nx > ex || ny < sy || ny > ey) {
+                    continue;
+                }
+                if (confirmed[nx][ny]) {
+                    continue;
+                }
+                if (board[nx][ny] != '.') {
+                    continue;
+                }
+                if (tryPlace(nx, ny, pi, pj, placements)) {
+                    placed = true;
+                    break;
+                }
+            }
+            (void)placed;
+        }
+    }
+
     void preprocessInitial(int pi, int pj, std::vector<std::pair<int, int>> &placements) {
         auto allowAll = [this](int x, int y) {
             return board[x][y] == '.';
@@ -462,6 +520,7 @@ struct Solver {
             preprocessed = true;
         }
         handleAdjacentToFlower(pi, pj, placements);
+        handleAdjacentSquares(pi, pj, placements);
 
         std::vector<int> availableDirs;
         for (int dir = 0; dir < 4; ++dir) {
