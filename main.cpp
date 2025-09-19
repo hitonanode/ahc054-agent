@@ -378,7 +378,18 @@ struct Solver {
                 placeWithFrontPreference(dir, pi, pj, placements, {2, 3}, 2);
             }
         } else if (availableDirs.size() == 1) {
-            placeWithFrontPreference(availableDirs.front(), pi, pj, placements, {2, 3}, 3);
+            int dir = availableDirs.front();
+            int nx2 = pi + dx[dir] * 2;
+            int ny2 = pj + dy[dir] * 2;
+            bool blocked = false;
+            if (!inside(nx2, ny2)) {
+                blocked = true;
+            } else if (board[nx2][ny2] == 'T') {
+                blocked = true;
+            }
+            if (!blocked) {
+                placeWithFrontPreference(dir, pi, pj, placements, {2, 3}, 3);
+            }
         }
 
         for (int dir = 0; dir < 4; ++dir) {
