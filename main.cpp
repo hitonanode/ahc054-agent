@@ -127,6 +127,26 @@ int main() {
             return true;
         };
 
+        auto fill_direction = [&](int dir, int start_step, bool allow_extend) -> bool {
+            for (int step = start_step;; ++step) {
+                int target_i = pi + di[dir] * step;
+                int target_j = pj + dj[dir] * step;
+                if (!inside(target_i, target_j)) {
+                    break;
+                }
+                if (is_tree[target_i][target_j]) {
+                    break;
+                }
+                if (attempt_place(target_i, target_j)) {
+                    return true;
+                }
+                if (!allow_extend) {
+                    break;
+                }
+            }
+            return false;
+        };
+
         // 条件1: 次の移動でAAに隣接し得る場合を遮断
         for (int dir = 0; dir < 4; ++dir) {
             int ni = pi + di[dir];
@@ -176,50 +196,93 @@ int main() {
             }
         }
 
-        // 条件3: 新たな確認済み空きマスが増える方向を遮断
+        // 条件3: 未探索隣接マスの個数に応じて遮断
+        std::array<bool, 4> neighbor_unexplored{};
+        const std::array<int, 4> opposite{1, 0, 3, 2};
+        int unexplored_count = 0;
         for (int dir = 0; dir < 4; ++dir) {
-            int ni = pi;
-            int nj = pj;
-            bool will_increase = false;
-            int max_place_step = 0;
-            for (int step = 1;; ++step) {
-                ni += di[dir];
-                nj += dj[dir];
-                if (!inside(ni, nj)) {
-                    break;
-                }
-                if (is_tree[ni][nj]) {
-                    break;
-                }
-                max_place_step = step;
-                if (!confirmed[ni][nj]) {
-                    will_increase = true;
-                }
-            }
-            if (!will_increase) {
+            int ni = pi + di[dir];
+            int nj = pj + dj[dir];
+            if (!inside(ni, nj)) {
                 continue;
             }
+            if (is_tree[ni][nj]) {
+                continue;
+            }
+            if (!confirmed[ni][nj]) {
+                neighbor_unexplored[dir] = true;
+                ++unexplored_count;
+            }
+        }
 
-            auto try_step = [&](int step) -> bool {
-                if (step <= 0 || step > max_place_step) {
-                    return false;
+        if (unexplored_count == 3) {
+            std::array<bool, 4> handled{};
+            for (int dir = 0; dir < 4; ++dir) {
+                if (!neighbor_unexplored[dir]) {
+                    continue;
                 }
-                int target_i = pi + di[dir] * step;
-                int target_j = pj + dj[dir] * step;
-                return attempt_place(target_i, target_j);
-            };
-
-            if (try_step(2)) {
-                continue;
-            }
-            if (try_step(1)) {
-                continue;
-            }
-            for (int step = 3; step <= max_place_step; ++step) {
-                if (try_step(step)) {
+                int opp = opposite[dir];
+                if (neighbor_unexplored[opp]) {
+                    fill_direction(dir, 2, true);
+                    handled[dir] = true;
+                    fill_direction(opp, 2, true);
+                    handled[opp] = true;
                     break;
                 }
             }
+            for (int dir = 0; dir < 4; ++dir) {
+                if (neighbor_unexplored[dir] && !handled[dir]) {
+                    fill_direction(dir, 1, false);
+                }
+            }
+        } else if (unexplored_count == 2) {
+            for (int dir = 0; dir < 4; ++dir) {
+                if (!neighbor_unexplored[dir]) {
+                    continue;
+                }
+                fill_direction(dir, 2, true);
+            }
+        } else if (unexplored_count == 1) {
+            for (int dir = 0; dir < 4; ++dir) {
+                if (!neighbor_unexplored[dir]) {
+                    continue;
+                }
+                fill_direction(dir, 3, true);
+            }
+        }
+
+        // 条件4: 隣接マスが確認済みで遠方に未確認が残る方向
+        for (int dir = 0; dir < 4; ++dir) {
+            int ni = pi + di[dir];
+            int nj = pj + dj[dir];
+            if (!inside(ni, nj)) {
+                continue;
+            }
+            if (!confirmed[ni][nj]) {
+                continue;
+            }
+            if (is_tree[ni][nj]) {
+                continue;
+            }
+            bool has_future_unconfirmed = false;
+            for (int step = 2;; ++step) {
+                int ti2 = pi + di[dir] * step;
+                int tj2 = pj + dj[dir] * step;
+                if (!inside(ti2, tj2)) {
+                    break;
+                }
+                if (is_tree[ti2][tj2]) {
+                    break;
+                }
+                if (!confirmed[ti2][tj2]) {
+                    has_future_unconfirmed = true;
+                    break;
+                }
+            }
+            if (!has_future_unconfirmed) {
+                continue;
+            }
+            fill_direction(dir, 2, true);
         }
 
         std::cout << placements.size();
