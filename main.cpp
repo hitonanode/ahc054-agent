@@ -1,396 +1,430 @@
-#include <algorithm>
-#include <array>
 #include <iostream>
-#include <queue>
 #include <vector>
+#include <string>
+#include <queue>
+#include <array>
+#include <utility>
+#include <algorithm>
 
-struct Position {
-    int i;
-    int j;
+struct Solver {
+    int N = 0;
+    int ti = 0;
+    int tj = 0;
+    int si = 0;
+    int sj = 0;
+    std::vector<std::string> initial;
+    std::vector<std::string> board;
+    std::vector<std::vector<bool>> confirmed;
+    const std::array<int, 4> dx{-1, 1, 0, 0};
+    const std::array<int, 4> dy{0, 0, -1, 1};
+
+    void init() {
+        std::cin >> N >> ti >> tj;
+        initial.resize(N);
+        for (int i = 0; i < N; ++i) {
+            std::cin >> initial[i];
+        }
+        board = initial;
+        confirmed.assign(N, std::vector<bool>(N, false));
+        si = 0;
+        sj = N / 2;
+        confirmed[si][sj] = true;
+    }
+
+    bool inside(int x, int y) const {
+        return 0 <= x && x < N && 0 <= y && y < N;
+    }
+
+    bool hasPath() const {
+        if (board[si][sj] != '.') {
+            return false;
+        }
+        std::queue<std::pair<int, int>> q;
+        std::vector<std::vector<bool>> visited(N, std::vector<bool>(N, false));
+        visited[si][sj] = true;
+        q.emplace(si, sj);
+        while (!q.empty()) {
+            auto [x, y] = q.front();
+            q.pop();
+            if (x == ti && y == tj) {
+                return true;
+            }
+            for (int dir = 0; dir < 4; ++dir) {
+                int nx = x + dx[dir];
+                int ny = y + dy[dir];
+                if (!inside(nx, ny)) {
+                    continue;
+                }
+                if (visited[nx][ny]) {
+                    continue;
+                }
+                if (board[nx][ny] != '.') {
+                    continue;
+                }
+                visited[nx][ny] = true;
+                q.emplace(nx, ny);
+            }
+        }
+        return false;
+    }
+
+    bool canPlace(int x, int y, int pi, int pj) const {
+        if (!inside(x, y)) {
+            return false;
+        }
+        if (confirmed[x][y]) {
+            return false;
+        }
+        if (board[x][y] != '.') {
+            return false;
+        }
+        if (x == pi && y == pj) {
+            return false;
+        }
+        if (x == ti && y == tj) {
+            return false;
+        }
+        return true;
+    }
+
+    bool tryPlace(int x, int y, int pi, int pj, std::vector<std::pair<int, int>> &placements) {
+        if (!canPlace(x, y, pi, pj)) {
+            return false;
+        }
+        board[x][y] = 'T';
+        if (!hasPath()) {
+            board[x][y] = '.';
+            return false;
+        }
+        placements.emplace_back(x, y);
+        return true;
+    }
+
+    bool frontConeClear(int dir, int dist, int pi, int pj) const {
+        if (dist <= 0) {
+            return false;
+        }
+        int baseX = pi + dx[dir] * (dist - 1);
+        int baseY = pj + dy[dir] * (dist - 1);
+        if (dir < 2) { // vertical
+            for (int deltaY = -1; deltaY <= 1; ++deltaY) {
+                int nx = baseX;
+                int ny = baseY + deltaY;
+                if (!inside(nx, ny)) {
+                    return false;
+                }
+                if (board[nx][ny] == 'T') {
+                    return false;
+                }
+            }
+        } else { // horizontal
+            for (int deltaX = -1; deltaX <= 1; ++deltaX) {
+                int nx = baseX + deltaX;
+                int ny = baseY;
+                if (!inside(nx, ny)) {
+                    return false;
+                }
+                if (board[nx][ny] == 'T') {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    void placeWithFrontPreference(int dir, int pi, int pj, std::vector<std::pair<int, int>> &placements,
+                                  const std::vector<int> &preferredDistances, int fallbackStart) {
+        bool placed = false;
+        for (int dist : preferredDistances) {
+            int nx = pi + dx[dir] * dist;
+            int ny = pj + dy[dir] * dist;
+            if (!inside(nx, ny)) {
+                break;
+            }
+            if (board[nx][ny] == 'T') {
+                break;
+            }
+            if (!canPlace(nx, ny, pi, pj)) {
+                continue;
+            }
+            if (!frontConeClear(dir, dist, pi, pj)) {
+                continue;
+            }
+            if (tryPlace(nx, ny, pi, pj, placements)) {
+                placed = true;
+                break;
+            }
+        }
+        if (placed) {
+            return;
+        }
+        for (int dist = fallbackStart;; ++dist) {
+            int nx = pi + dx[dir] * dist;
+            int ny = pj + dy[dir] * dist;
+            if (!inside(nx, ny)) {
+                break;
+            }
+            if (board[nx][ny] == 'T') {
+                break;
+            }
+            if (!canPlace(nx, ny, pi, pj)) {
+                continue;
+            }
+            if (tryPlace(nx, ny, pi, pj, placements)) {
+                break;
+            }
+        }
+    }
+
+    void handleConfirmedFront(int dir, int pi, int pj, std::vector<std::pair<int, int>> &placements) {
+        int adjX = pi + dx[dir];
+        int adjY = pj + dy[dir];
+        if (!inside(adjX, adjY)) {
+            return;
+        }
+        if (!confirmed[adjX][adjY]) {
+            return;
+        }
+        if (board[adjX][adjY] == 'T') {
+            return;
+        }
+        for (int dist = 2;; ++dist) {
+            int nx = pi + dx[dir] * dist;
+            int ny = pj + dy[dir] * dist;
+            if (!inside(nx, ny)) {
+                break;
+            }
+            if (board[nx][ny] == 'T') {
+                break;
+            }
+            if (confirmed[nx][ny]) {
+                continue;
+            }
+            if (tryPlace(nx, ny, pi, pj, placements)) {
+                break;
+            }
+        }
+    }
+
+    void blockLineToTarget(int pi, int pj, int tx, int ty, std::vector<std::pair<int, int>> &placements) {
+        if (pi == tx) {
+            int step = (ty > pj) ? 1 : -1;
+            bool blocked = false;
+            for (int y = pj + step; y != ty; y += step) {
+                if (board[pi][y] == 'T') {
+                    blocked = true;
+                    break;
+                }
+            }
+            if (blocked) {
+                return;
+            }
+            for (int y = pj + step; y != ty; y += step) {
+                if (tryPlace(pi, y, pi, pj, placements)) {
+                    return;
+                }
+            }
+        } else if (pj == ty) {
+            int step = (tx > pi) ? 1 : -1;
+            bool blocked = false;
+            for (int x = pi + step; x != tx; x += step) {
+                if (board[x][pj] == 'T') {
+                    blocked = true;
+                    break;
+                }
+            }
+            if (blocked) {
+                return;
+            }
+            for (int x = pi + step; x != tx; x += step) {
+                if (tryPlace(x, pj, pi, pj, placements)) {
+                    return;
+                }
+            }
+        }
+    }
+
+    void blockLineToFlower(int pi, int pj, std::vector<std::pair<int, int>> &placements) {
+        blockLineToTarget(pi, pj, ti, tj, placements);
+    }
+
+    void blockLineToFlowerNeighbors(int pi, int pj, std::vector<std::pair<int, int>> &placements) {
+        for (int dir = 0; dir < 4; ++dir) {
+            int ax = ti + dx[dir];
+            int ay = tj + dy[dir];
+            if (!inside(ax, ay)) {
+                continue;
+            }
+            if (board[ax][ay] == 'T') {
+                continue;
+            }
+            int moveDir = -1;
+            if (pi == ax) {
+                moveDir = (ay > pj) ? 3 : 2; // right or left
+            } else if (pj == ay) {
+                moveDir = (ax > pi) ? 1 : 0; // down or up
+            }
+            if (moveDir == -1) {
+                continue;
+            }
+            bool blocked = false;
+            int cx = pi + dx[moveDir];
+            int cy = pj + dy[moveDir];
+            while (inside(cx, cy)) {
+                if (cx == ax && cy == ay) {
+                    break;
+                }
+                if (board[cx][cy] == 'T') {
+                    blocked = true;
+                    break;
+                }
+                cx += dx[moveDir];
+                cy += dy[moveDir];
+            }
+            if (blocked) {
+                continue;
+            }
+            if (cx != ax || cy != ay) {
+                continue;
+            }
+            cx = pi + dx[moveDir];
+            cy = pj + dy[moveDir];
+            while (inside(cx, cy)) {
+                if (tryPlace(cx, cy, pi, pj, placements)) {
+                    break;
+                }
+                if (cx == ax && cy == ay) {
+                    break;
+                }
+                cx += dx[moveDir];
+                cy += dy[moveDir];
+            }
+        }
+    }
+
+    void handleAdjacentToFlower(int pi, int pj, std::vector<std::pair<int, int>> &placements) {
+        for (int dir = 0; dir < 4; ++dir) {
+            int nx = pi + dx[dir];
+            int ny = pj + dy[dir];
+            if (!inside(nx, ny)) {
+                continue;
+            }
+            if (board[nx][ny] != '.') {
+                continue;
+            }
+            if (confirmed[nx][ny]) {
+                continue;
+            }
+            if (std::abs(nx - ti) + std::abs(ny - tj) == 1) {
+                tryPlace(nx, ny, pi, pj, placements);
+            }
+        }
+    }
+
+    std::vector<std::pair<int, int>> planTurn(int pi, int pj) {
+        std::vector<std::pair<int, int>> placements;
+        handleAdjacentToFlower(pi, pj, placements);
+
+        std::vector<int> availableDirs;
+        for (int dir = 0; dir < 4; ++dir) {
+            int nx = pi + dx[dir];
+            int ny = pj + dy[dir];
+            if (!inside(nx, ny)) {
+                continue;
+            }
+            if (board[nx][ny] != '.') {
+                continue;
+            }
+            if (confirmed[nx][ny]) {
+                continue;
+            }
+            availableDirs.push_back(dir);
+        }
+
+        if (availableDirs.size() == 3) {
+            bool hasOppositeVertical = false;
+            bool hasOppositeHorizontal = false;
+            if (std::find(availableDirs.begin(), availableDirs.end(), 0) != availableDirs.end() &&
+                std::find(availableDirs.begin(), availableDirs.end(), 1) != availableDirs.end()) {
+                hasOppositeVertical = true;
+            }
+            if (std::find(availableDirs.begin(), availableDirs.end(), 2) != availableDirs.end() &&
+                std::find(availableDirs.begin(), availableDirs.end(), 3) != availableDirs.end()) {
+                hasOppositeHorizontal = true;
+            }
+            if (hasOppositeVertical) {
+                placeWithFrontPreference(0, pi, pj, placements, {2, 3}, 2);
+                placeWithFrontPreference(1, pi, pj, placements, {2, 3}, 2);
+                for (int dir : availableDirs) {
+                    if (dir != 0 && dir != 1) {
+                        int nx = pi + dx[dir];
+                        int ny = pj + dy[dir];
+                        tryPlace(nx, ny, pi, pj, placements);
+                    }
+                }
+            } else if (hasOppositeHorizontal) {
+                placeWithFrontPreference(2, pi, pj, placements, {2, 3}, 2);
+                placeWithFrontPreference(3, pi, pj, placements, {2, 3}, 2);
+                for (int dir : availableDirs) {
+                    if (dir != 2 && dir != 3) {
+                        int nx = pi + dx[dir];
+                        int ny = pj + dy[dir];
+                        tryPlace(nx, ny, pi, pj, placements);
+                    }
+                }
+            }
+        } else if (availableDirs.size() == 2) {
+            for (int dir : availableDirs) {
+                placeWithFrontPreference(dir, pi, pj, placements, {2, 3}, 2);
+            }
+        } else if (availableDirs.size() == 1) {
+            placeWithFrontPreference(availableDirs.front(), pi, pj, placements, {2, 3}, 3);
+        }
+
+        for (int dir = 0; dir < 4; ++dir) {
+            handleConfirmedFront(dir, pi, pj, placements);
+        }
+
+        blockLineToFlower(pi, pj, placements);
+        blockLineToFlowerNeighbors(pi, pj, placements);
+
+        return placements;
+    }
 };
 
 int main() {
     std::ios::sync_with_stdio(false);
     std::cin.tie(nullptr);
 
-    int N;
-    int ti;
-    int tj;
-    if (!(std::cin >> N >> ti >> tj)) {
-        return 0;
-    }
-
-    std::vector<std::string> initial(N);
-    for (int i = 0; i < N; ++i) {
-        std::cin >> initial[i];
-    }
-
-    std::vector<std::vector<bool>> is_tree(N, std::vector<bool>(N, false));
-    for (int i = 0; i < N; ++i) {
-        for (int j = 0; j < N; ++j) {
-            if (initial[i][j] == 'T') {
-                is_tree[i][j] = true;
-            }
-        }
-    }
-
-    std::vector<std::vector<bool>> confirmed(N, std::vector<bool>(N, false));
-
-    const Position entrance{0, N / 2};
-    const std::array<int, 4> di{-1, 1, 0, 0};
-    const std::array<int, 4> dj{0, 0, -1, 1};
-
-    auto inside = [&](int i, int j) -> bool {
-        return 0 <= i && i < N && 0 <= j && j < N;
-    };
-
-    auto has_path = [&]() -> bool {
-        if (!inside(entrance.i, entrance.j) || !inside(ti, tj)) {
-            return false;
-        }
-        if (is_tree[entrance.i][entrance.j] || is_tree[ti][tj]) {
-            return false;
-        }
-        std::vector<std::vector<bool>> visited(N, std::vector<bool>(N, false));
-        std::queue<Position> q;
-        q.push(entrance);
-        visited[entrance.i][entrance.j] = true;
-        while (!q.empty()) {
-            Position cur = q.front();
-            q.pop();
-            if (cur.i == ti && cur.j == tj) {
-                return true;
-            }
-            for (int dir = 0; dir < 4; ++dir) {
-                int ni = cur.i + di[dir];
-                int nj = cur.j + dj[dir];
-                if (!inside(ni, nj)) {
-                    continue;
-                }
-                if (visited[ni][nj]) {
-                    continue;
-                }
-                if (is_tree[ni][nj]) {
-                    continue;
-                }
-                visited[ni][nj] = true;
-                q.push(Position{ni, nj});
-            }
-        }
-        return false;
-    };
+    Solver solver;
+    solver.init();
 
     while (true) {
-        int pi;
-        int pj;
+        int pi = 0;
+        int pj = 0;
         if (!(std::cin >> pi >> pj)) {
-            break;
+            return 0;
         }
-        int n;
+        int n = 0;
         std::cin >> n;
         for (int k = 0; k < n; ++k) {
-            int x;
-            int y;
+            int x = 0;
+            int y = 0;
             std::cin >> x >> y;
-            if (inside(x, y)) {
-                confirmed[x][y] = true;
+            if (solver.inside(x, y)) {
+                solver.confirmed[x][y] = true;
             }
         }
-
-        if (pi == ti && pj == tj) {
+        if (pi == solver.ti && pj == solver.tj) {
             break;
         }
-
-        std::vector<Position> placements;
-
-        auto attempt_place = [&](int x, int y) -> bool {
-            if (!inside(x, y)) {
-                return false;
-            }
-            if (is_tree[x][y]) {
-                return false;
-            }
-            if (confirmed[x][y]) {
-                return false;
-            }
-            if (x == pi && y == pj) {
-                return false;
-            }
-            if (x == ti && y == tj) {
-                return false;
-            }
-            is_tree[x][y] = true;
-            if (!has_path()) {
-                is_tree[x][y] = false;
-                return false;
-            }
-            placements.push_back(Position{x, y});
-            return true;
-        };
-
-        auto fill_direction = [&](int dir, int start_step, bool allow_extend) -> bool {
-            for (int step = start_step;; ++step) {
-                int target_i = pi + di[dir] * step;
-                int target_j = pj + dj[dir] * step;
-                if (!inside(target_i, target_j)) {
-                    break;
-                }
-                if (is_tree[target_i][target_j]) {
-                    break;
-                }
-                if (attempt_place(target_i, target_j)) {
-                    return true;
-                }
-                if (!allow_extend) {
-                    break;
-                }
-            }
-            return false;
-        };
-
-        auto place_near_clear = [&](int dir) -> bool {
-            for (int step = 2; step <= 3; ++step) {
-                int target_i = pi + di[dir] * step;
-                int target_j = pj + dj[dir] * step;
-                if (!inside(target_i, target_j)) {
-                    continue;
-                }
-                if (is_tree[target_i][target_j]) {
-                    break;
-                }
-                std::vector<std::pair<int, bool>> neighbors;
-                neighbors.reserve(8);
-                for (int ddi = -1; ddi <= 1; ++ddi) {
-                    for (int ddj = -1; ddj <= 1; ++ddj) {
-                        if (ddi == 0 && ddj == 0) {
-                            continue;
-                        }
-                        int ni2 = target_i + ddi;
-                        int nj2 = target_j + ddj;
-                        int dist = std::abs(ni2 - pi) + std::abs(nj2 - pj);
-                        bool blocked = true;
-                        if (inside(ni2, nj2)) {
-                            blocked = is_tree[ni2][nj2];
-                        }
-                        neighbors.emplace_back(dist, blocked);
-                    }
-                }
-                std::sort(neighbors.begin(), neighbors.end(), [](const auto &a, const auto &b) {
-                    return a.first < b.first;
-                });
-                bool ok = true;
-                int checked = 0;
-                for (const auto &nb : neighbors) {
-                    if (checked >= 3) {
-                        break;
-                    }
-                    if (nb.second) {
-                        ok = false;
-                        break;
-                    }
-                    ++checked;
-                }
-                if (!ok) {
-                    continue;
-                }
-                if (attempt_place(target_i, target_j)) {
-                    return true;
-                }
-            }
-            return false;
-        };
-
-        // 条件1: 次の移動でAAに隣接し得る場合を遮断
-        for (int dir = 0; dir < 4; ++dir) {
-            int ni = pi + di[dir];
-            int nj = pj + dj[dir];
-            if (!inside(ni, nj)) {
-                continue;
-            }
-            if (is_tree[ni][nj]) {
-                continue;
-            }
-            int dist = std::abs(ni - ti) + std::abs(nj - tj);
-            if (dist == 1) {
-                attempt_place(ni, nj);
-            }
-        }
-
-        // 条件2: 未探索隣接マスの個数に応じて遮断
-        std::array<bool, 4> neighbor_unexplored{};
-        const std::array<int, 4> opposite{1, 0, 3, 2};
-        int unexplored_count = 0;
-        for (int dir = 0; dir < 4; ++dir) {
-            int ni = pi + di[dir];
-            int nj = pj + dj[dir];
-            if (!inside(ni, nj)) {
-                continue;
-            }
-            if (is_tree[ni][nj]) {
-                continue;
-            }
-            if (!confirmed[ni][nj]) {
-                neighbor_unexplored[dir] = true;
-                ++unexplored_count;
-            }
-        }
-
-        if (unexplored_count == 3) {
-            std::array<bool, 4> handled{};
-            for (int dir = 0; dir < 4; ++dir) {
-                if (!neighbor_unexplored[dir] || handled[dir]) {
-                    continue;
-                }
-                int opp = opposite[dir];
-                if (neighbor_unexplored[opp] && !handled[opp]) {
-                    bool placed_dir = place_near_clear(dir);
-                    if (!placed_dir) {
-                        fill_direction(dir, 2, true);
-                    }
-                    handled[dir] = true;
-                    bool placed_opp = place_near_clear(opp);
-                    if (!placed_opp) {
-                        fill_direction(opp, 2, true);
-                    }
-                    handled[opp] = true;
-                    break;
-                }
-            }
-            for (int dir = 0; dir < 4; ++dir) {
-                if (neighbor_unexplored[dir] && !handled[dir]) {
-                    fill_direction(dir, 1, false);
-                }
-            }
-        } else if (unexplored_count == 2) {
-            for (int dir = 0; dir < 4; ++dir) {
-                if (!neighbor_unexplored[dir]) {
-                    continue;
-                }
-                bool placed = place_near_clear(dir);
-                if (!placed) {
-                    fill_direction(dir, 2, true);
-                }
-            }
-        } else if (unexplored_count == 1) {
-            for (int dir = 0; dir < 4; ++dir) {
-                if (!neighbor_unexplored[dir]) {
-                    continue;
-                }
-                bool placed = place_near_clear(dir);
-                if (!placed) {
-                    fill_direction(dir, 3, true);
-                }
-            }
-        }
-
-        // 条件3: 隣接マスが確認済みで遠方に未確認が残る方向
-        for (int dir = 0; dir < 4; ++dir) {
-            int ni = pi + di[dir];
-            int nj = pj + dj[dir];
-            if (!inside(ni, nj)) {
-                continue;
-            }
-            if (!confirmed[ni][nj]) {
-                continue;
-            }
-            if (is_tree[ni][nj]) {
-                continue;
-            }
-            bool has_future_unconfirmed = false;
-            for (int step = 2;; ++step) {
-                int ti2 = pi + di[dir] * step;
-                int tj2 = pj + dj[dir] * step;
-                if (!inside(ti2, tj2)) {
-                    break;
-                }
-                if (is_tree[ti2][tj2]) {
-                    break;
-                }
-                if (!confirmed[ti2][tj2]) {
-                    has_future_unconfirmed = true;
-                    break;
-                }
-            }
-            if (!has_future_unconfirmed) {
-                continue;
-            }
-            fill_direction(dir, 2, true);
-        }
-
-        // 条件4: 今ターンでAAが確認される場合の遮断
-        for (int dir = 0; dir < 4; ++dir) {
-            int ni = pi;
-            int nj = pj;
-            bool detect_target = false;
-            while (true) {
-                ni += di[dir];
-                nj += dj[dir];
-                if (!inside(ni, nj)) {
-                    break;
-                }
-                if (is_tree[ni][nj]) {
-                    break;
-                }
-                if (ni == ti && nj == tj) {
-                    detect_target = true;
-                    break;
-                }
-            }
-            if (!detect_target) {
-                continue;
-            }
-            ni = pi + di[dir];
-            nj = pj + dj[dir];
-            while (ni != ti || nj != tj) {
-                if (attempt_place(ni, nj)) {
-                    break;
-                }
-                ni += di[dir];
-                nj += dj[dir];
-            }
-        }
-
-        // 条件5: AA に隣接するマスが確認される場合の遮断
-        for (int dir = 0; dir < 4; ++dir) {
-            int ni = pi;
-            int nj = pj;
-            bool detect_adjacent = false;
-            int target_step = 0;
-            for (int step = 1;; ++step) {
-                ni += di[dir];
-                nj += dj[dir];
-                if (!inside(ni, nj)) {
-                    break;
-                }
-                if (is_tree[ni][nj]) {
-                    break;
-                }
-                if (std::abs(ni - ti) + std::abs(nj - tj) == 1) {
-                    detect_adjacent = true;
-                    target_step = step;
-                    break;
-                }
-            }
-            if (!detect_adjacent) {
-                continue;
-            }
-            ni = pi + di[dir];
-            nj = pj + dj[dir];
-            for (int step = 1; step <= target_step; ++step) {
-                if (attempt_place(ni, nj)) {
-                    break;
-                }
-                ni += di[dir];
-                nj += dj[dir];
-            }
-        }
-
+        auto placements = solver.planTurn(pi, pj);
         std::cout << placements.size();
-        for (const auto &pos : placements) {
-            std::cout << ' ' << pos.i << ' ' << pos.j;
+        for (auto [x, y] : placements) {
+            std::cout << ' ' << x << ' ' << y;
         }
-        std::cout << std::endl;
+        std::cout << '\n';
+        std::cout.flush();
     }
-
     return 0;
 }
