@@ -216,75 +216,7 @@ int main() {
             }
         }
 
-        // 条件2: 今ターンでAAが確認される場合の遮断
-        for (int dir = 0; dir < 4; ++dir) {
-            int ni = pi;
-            int nj = pj;
-            bool detect_target = false;
-            while (true) {
-                ni += di[dir];
-                nj += dj[dir];
-                if (!inside(ni, nj)) {
-                    break;
-                }
-                if (is_tree[ni][nj]) {
-                    break;
-                }
-                if (ni == ti && nj == tj) {
-                    detect_target = true;
-                    break;
-                }
-            }
-            if (!detect_target) {
-                continue;
-            }
-            ni = pi + di[dir];
-            nj = pj + dj[dir];
-            while (ni != ti || nj != tj) {
-                if (attempt_place(ni, nj)) {
-                    break;
-                }
-                ni += di[dir];
-                nj += dj[dir];
-            }
-        }
-
-        // 条件3: AA に隣接するマスが確認される場合の遮断
-        for (int dir = 0; dir < 4; ++dir) {
-            int ni = pi;
-            int nj = pj;
-            bool detect_adjacent = false;
-            int target_step = 0;
-            for (int step = 1;; ++step) {
-                ni += di[dir];
-                nj += dj[dir];
-                if (!inside(ni, nj)) {
-                    break;
-                }
-                if (is_tree[ni][nj]) {
-                    break;
-                }
-                if (std::abs(ni - ti) + std::abs(nj - tj) == 1) {
-                    detect_adjacent = true;
-                    target_step = step;
-                    break;
-                }
-            }
-            if (!detect_adjacent) {
-                continue;
-            }
-            ni = pi + di[dir];
-            nj = pj + dj[dir];
-            for (int step = 1; step <= target_step; ++step) {
-                if (attempt_place(ni, nj)) {
-                    break;
-                }
-                ni += di[dir];
-                nj += dj[dir];
-            }
-        }
-
-        // 条件4: 未探索隣接マスの個数に応じて遮断
+        // 条件2: 未探索隣接マスの個数に応じて遮断
         std::array<bool, 4> neighbor_unexplored{};
         const std::array<int, 4> opposite{1, 0, 3, 2};
         int unexplored_count = 0;
@@ -351,7 +283,7 @@ int main() {
             }
         }
 
-        // 条件5: 隣接マスが確認済みで遠方に未確認が残る方向
+        // 条件3: 隣接マスが確認済みで遠方に未確認が残る方向
         for (int dir = 0; dir < 4; ++dir) {
             int ni = pi + di[dir];
             int nj = pj + dj[dir];
@@ -383,6 +315,74 @@ int main() {
                 continue;
             }
             fill_direction(dir, 2, true);
+        }
+
+        // 条件4: 今ターンでAAが確認される場合の遮断
+        for (int dir = 0; dir < 4; ++dir) {
+            int ni = pi;
+            int nj = pj;
+            bool detect_target = false;
+            while (true) {
+                ni += di[dir];
+                nj += dj[dir];
+                if (!inside(ni, nj)) {
+                    break;
+                }
+                if (is_tree[ni][nj]) {
+                    break;
+                }
+                if (ni == ti && nj == tj) {
+                    detect_target = true;
+                    break;
+                }
+            }
+            if (!detect_target) {
+                continue;
+            }
+            ni = pi + di[dir];
+            nj = pj + dj[dir];
+            while (ni != ti || nj != tj) {
+                if (attempt_place(ni, nj)) {
+                    break;
+                }
+                ni += di[dir];
+                nj += dj[dir];
+            }
+        }
+
+        // 条件5: AA に隣接するマスが確認される場合の遮断
+        for (int dir = 0; dir < 4; ++dir) {
+            int ni = pi;
+            int nj = pj;
+            bool detect_adjacent = false;
+            int target_step = 0;
+            for (int step = 1;; ++step) {
+                ni += di[dir];
+                nj += dj[dir];
+                if (!inside(ni, nj)) {
+                    break;
+                }
+                if (is_tree[ni][nj]) {
+                    break;
+                }
+                if (std::abs(ni - ti) + std::abs(nj - tj) == 1) {
+                    detect_adjacent = true;
+                    target_step = step;
+                    break;
+                }
+            }
+            if (!detect_adjacent) {
+                continue;
+            }
+            ni = pi + di[dir];
+            nj = pj + dj[dir];
+            for (int step = 1; step <= target_step; ++step) {
+                if (attempt_place(ni, nj)) {
+                    break;
+                }
+                ni += di[dir];
+                nj += dj[dir];
+            }
         }
 
         std::cout << placements.size();
