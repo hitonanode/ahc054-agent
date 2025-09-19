@@ -99,14 +99,67 @@ struct Solver {
         return true;
     }
 
+    std::vector<std::vector<bool>> computeNeedsAvoidingNear() const {
+        std::vector<std::vector<bool>> needs(N, std::vector<bool>(N, false));
+        if (board[si][sj] != '.') {
+            return needs;
+        }
+        std::queue<std::pair<int, int>> q;
+        std::vector<std::vector<bool>> visited(N, std::vector<bool>(N, false));
+        if (manhattanDistance(si, sj, ti, tj) > 2) {
+            q.emplace(si, sj);
+            visited[si][sj] = true;
+        }
+        while (!q.empty()) {
+            auto [x, y] = q.front();
+            q.pop();
+            for (int dir = 0; dir < 4; ++dir) {
+                int nx = x + dx[dir];
+                int ny = y + dy[dir];
+                if (!inside(nx, ny)) {
+                    continue;
+                }
+                if (visited[nx][ny]) {
+                    continue;
+                }
+                if (board[nx][ny] != '.') {
+                    continue;
+                }
+                if (manhattanDistance(nx, ny, ti, tj) <= 2) {
+                    continue;
+                }
+                visited[nx][ny] = true;
+                q.emplace(nx, ny);
+            }
+        }
+        for (int i = 0; i < N; ++i) {
+            for (int j = 0; j < N; ++j) {
+                if (board[i][j] == '.' && manhattanDistance(i, j, ti, tj) > 2 && !visited[i][j]) {
+                    needs[i][j] = true;
+                }
+            }
+        }
+        return needs;
+    }
+
     bool tryPlace(int x, int y, int pi, int pj, std::vector<std::pair<int, int>> &placements) {
         if (!canPlace(x, y, pi, pj)) {
             return false;
         }
+        auto beforeNeeds = computeNeedsAvoidingNear();
         board[x][y] = 'T';
         if (!maintainsConnectivity()) {
             board[x][y] = '.';
             return false;
+        }
+        auto afterNeeds = computeNeedsAvoidingNear();
+        for (int i = 0; i < N; ++i) {
+            for (int j = 0; j < N; ++j) {
+                if (afterNeeds[i][j] && !beforeNeeds[i][j]) {
+                    board[x][y] = '.';
+                    return false;
+                }
+            }
         }
         placements.emplace_back(x, y);
         return true;
