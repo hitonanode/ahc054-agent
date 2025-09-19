@@ -216,6 +216,49 @@ struct Solver {
         return path;
     }
 
+    void blockStraightPath(int pi, int pj, int tx, int ty, bool targetPriority,
+                           std::vector<std::pair<int, int>> &placements) {
+        if (pi == tx) {
+            int step = (ty > pj) ? 1 : -1;
+            for (int y = pj + step; y != ty; y += step) {
+                if (board[pi][y] == 'T') {
+                    return;
+                }
+            }
+            std::vector<std::pair<int, int>> candidates;
+            for (int y = pj + step; y != ty; y += step) {
+                candidates.emplace_back(pi, y);
+            }
+            if (targetPriority) {
+                std::reverse(candidates.begin(), candidates.end());
+            }
+            for (auto [cx, cy] : candidates) {
+                if (tryPlace(cx, cy, pi, pj, placements)) {
+                    return;
+                }
+            }
+        } else if (pj == ty) {
+            int step = (tx > pi) ? 1 : -1;
+            for (int x = pi + step; x != tx; x += step) {
+                if (board[x][pj] == 'T') {
+                    return;
+                }
+            }
+            std::vector<std::pair<int, int>> candidates;
+            for (int x = pi + step; x != tx; x += step) {
+                candidates.emplace_back(x, pj);
+            }
+            if (targetPriority) {
+                std::reverse(candidates.begin(), candidates.end());
+            }
+            for (auto [cx, cy] : candidates) {
+                if (tryPlace(cx, cy, pi, pj, placements)) {
+                    return;
+                }
+            }
+        }
+    }
+
     std::vector<std::vector<int>> bfsDistance(int sx, int sy) const {
         std::vector<std::vector<int>> dist(N, std::vector<int>(N, -1));
         if (!inside(sx, sy) || board[sx][sy] != '.') {
@@ -352,46 +395,8 @@ struct Solver {
         }
     }
 
-    void blockLineToTarget(int pi, int pj, int tx, int ty, std::vector<std::pair<int, int>> &placements) {
-        if (pi == tx) {
-            int step = (ty > pj) ? 1 : -1;
-            bool blocked = false;
-            for (int y = pj + step; y != ty; y += step) {
-                if (board[pi][y] == 'T') {
-                    blocked = true;
-                    break;
-                }
-            }
-            if (blocked) {
-                return;
-            }
-            for (int y = pj + step; y != ty; y += step) {
-                if (tryPlace(pi, y, pi, pj, placements)) {
-                    return;
-                }
-            }
-        } else if (pj == ty) {
-            int step = (tx > pi) ? 1 : -1;
-            bool blocked = false;
-            for (int x = pi + step; x != tx; x += step) {
-                if (board[x][pj] == 'T') {
-                    blocked = true;
-                    break;
-                }
-            }
-            if (blocked) {
-                return;
-            }
-            for (int x = pi + step; x != tx; x += step) {
-                if (tryPlace(x, pj, pi, pj, placements)) {
-                    return;
-                }
-            }
-        }
-    }
-
     void blockLineToFlower(int pi, int pj, std::vector<std::pair<int, int>> &placements) {
-        blockLineToTarget(pi, pj, ti, tj, placements);
+        blockStraightPath(pi, pj, ti, tj, true, placements);
     }
 
     void blockLineToFlowerNeighbors(int pi, int pj, std::vector<std::pair<int, int>> &placements) {
@@ -404,51 +409,51 @@ struct Solver {
             if (board[ax][ay] == 'T') {
                 continue;
             }
-            int moveDir = -1;
-            if (pi == ax) {
-                moveDir = (ay > pj) ? 3 : 2; // right or left
-            } else if (pj == ay) {
-                moveDir = (ax > pi) ? 1 : 0; // down or up
+            if (pi == ax || pj == ay) {
+                blockStraightPath(pi, pj, ax, ay, true, placements);
             }
-            if (moveDir == -1) {
+        }
+    }
+
+    void handleFlowerRemainingDirection(int pi, int pj, std::vector<std::pair<int, int>> &placements) {
+        int treeCount = 0;
+        int remainingDir = -1;
+        for (int dir = 0; dir < 4; ++dir) {
+            int nx = ti + dx[dir];
+            int ny = tj + dy[dir];
+            if (!inside(nx, ny)) {
+                treeCount++;
                 continue;
             }
-            bool blocked = false;
-            int cx = pi + dx[moveDir];
-            int cy = pj + dy[moveDir];
-            while (inside(cx, cy)) {
-                if (cx == ax && cy == ay) {
-                    break;
+            if (board[nx][ny] == 'T') {
+                treeCount++;
+            } else {
+                if (remainingDir == -1) {
+                    remainingDir = dir;
+                } else {
+                    remainingDir = -2;
                 }
-                if (board[cx][cy] == 'T') {
-                    blocked = true;
-                    break;
-                }
-                cx += dx[moveDir];
-                cy += dy[moveDir];
             }
-            if (blocked) {
-                continue;
-            }
-            if (cx != ax || cy != ay) {
-                continue;
-            }
-            cx = pi + dx[moveDir];
-            cy = pj + dy[moveDir];
-            while (inside(cx, cy)) {
-                if (tryPlace(cx, cy, pi, pj, placements)) {
+        }
+        if (treeCount == 3 && remainingDir >= 0) {
+            for (int dist = 1;; ++dist) {
+                int nx = ti + dx[remainingDir] * dist;
+                int ny = tj + dy[remainingDir] * dist;
+                if (!inside(nx, ny)) {
                     break;
                 }
-                if (cx == ax && cy == ay) {
+                if (board[nx][ny] == 'T') {
                     break;
                 }
-                cx += dx[moveDir];
-                cy += dy[moveDir];
+                if (tryPlace(nx, ny, pi, pj, placements)) {
+                    break;
+                }
             }
         }
     }
 
     void handleAdjacentToFlower(int pi, int pj, std::vector<std::pair<int, int>> &placements) {
+        std::vector<std::pair<int, int>> candidates;
         for (int dir = 0; dir < 4; ++dir) {
             int nx = pi + dx[dir];
             int ny = pj + dy[dir];
@@ -462,7 +467,20 @@ struct Solver {
                 continue;
             }
             if (std::abs(nx - ti) + std::abs(ny - tj) == 1) {
-                tryPlace(nx, ny, pi, pj, placements);
+                candidates.emplace_back(nx, ny);
+            }
+        }
+        std::sort(candidates.begin(), candidates.end(), [&](const auto &a, const auto &b) {
+            int da = manhattanDistance(a.first, a.second, ti, tj);
+            int db = manhattanDistance(b.first, b.second, ti, tj);
+            if (da != db) {
+                return da < db;
+            }
+            return a < b;
+        });
+        for (auto [nx, ny] : candidates) {
+            if (tryPlace(nx, ny, pi, pj, placements)) {
+                break;
             }
         }
     }
@@ -738,6 +756,7 @@ struct Solver {
 
         blockLineToFlower(pi, pj, placements);
         blockLineToFlowerNeighbors(pi, pj, placements);
+        handleFlowerRemainingDirection(pi, pj, placements);
 
         return placements;
     }
