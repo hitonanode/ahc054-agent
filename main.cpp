@@ -40,7 +40,7 @@ struct Solver {
         return std::abs(x1 - x2) + std::abs(y1 - y2);
     }
 
-    bool maintainsConnectivity() const {
+    bool hasPathToFlower() const {
         if (board[si][sj] != '.') {
             return false;
         }
@@ -51,6 +51,9 @@ struct Solver {
         while (!q.empty()) {
             auto [x, y] = q.front();
             q.pop();
+            if (x == ti && y == tj) {
+                return true;
+            }
             for (int dir = 0; dir < 4; ++dir) {
                 int nx = x + dx[dir];
                 int ny = y + dy[dir];
@@ -67,17 +70,7 @@ struct Solver {
                 q.emplace(nx, ny);
             }
         }
-        if (!visited[ti][tj]) {
-            return false;
-        }
-        for (int i = 0; i < N; ++i) {
-            for (int j = 0; j < N; ++j) {
-                if (board[i][j] == '.' && !visited[i][j]) {
-                    return false;
-                }
-            }
-        }
-        return true;
+        return false;
     }
 
     bool canPlace(int x, int y, int pi, int pj) const {
@@ -142,22 +135,27 @@ struct Solver {
         return needs;
     }
 
-    bool tryPlace(int x, int y, int pi, int pj, std::vector<std::pair<int, int>> &placements) {
+    bool tryPlace(int x, int y, int pi, int pj, std::vector<std::pair<int, int>> &placements, bool highPriority = false) {
         if (!canPlace(x, y, pi, pj)) {
             return false;
         }
-        auto beforeNeeds = computeNeedsAvoidingNear();
+        std::vector<std::vector<bool>> beforeNeeds;
+        if (!highPriority) {
+            beforeNeeds = computeNeedsAvoidingNear();
+        }
         board[x][y] = 'T';
-        if (!maintainsConnectivity()) {
+        if (!hasPathToFlower()) {
             board[x][y] = '.';
             return false;
         }
-        auto afterNeeds = computeNeedsAvoidingNear();
-        for (int i = 0; i < N; ++i) {
-            for (int j = 0; j < N; ++j) {
-                if (afterNeeds[i][j] && !beforeNeeds[i][j]) {
-                    board[x][y] = '.';
-                    return false;
+        if (!highPriority) {
+            auto afterNeeds = computeNeedsAvoidingNear();
+            for (int i = 0; i < N; ++i) {
+                for (int j = 0; j < N; ++j) {
+                    if (afterNeeds[i][j] && !beforeNeeds[i][j]) {
+                        board[x][y] = '.';
+                        return false;
+                    }
                 }
             }
         }
@@ -233,7 +231,7 @@ struct Solver {
                 std::reverse(candidates.begin(), candidates.end());
             }
             for (auto [cx, cy] : candidates) {
-                if (tryPlace(cx, cy, pi, pj, placements)) {
+                if (tryPlace(cx, cy, pi, pj, placements, targetPriority)) {
                     return;
                 }
             }
@@ -252,10 +250,41 @@ struct Solver {
                 std::reverse(candidates.begin(), candidates.end());
             }
             for (auto [cx, cy] : candidates) {
-                if (tryPlace(cx, cy, pi, pj, placements)) {
+                if (tryPlace(cx, cy, pi, pj, placements, targetPriority)) {
                     return;
                 }
             }
+        }
+    }
+
+    void preventImmediateAdjacency(int pi, int pj, std::vector<std::pair<int, int>> &placements) {
+        std::vector<std::pair<int, int>> candidates;
+        for (int dir = 0; dir < 4; ++dir) {
+            int nx = pi + dx[dir];
+            int ny = pj + dy[dir];
+            if (!inside(nx, ny)) {
+                continue;
+            }
+            if (board[nx][ny] != '.') {
+                continue;
+            }
+            if (confirmed[nx][ny]) {
+                continue;
+            }
+            if (manhattanDistance(nx, ny, ti, tj) == 1) {
+                candidates.emplace_back(nx, ny);
+            }
+        }
+        std::sort(candidates.begin(), candidates.end(), [&](const auto &a, const auto &b) {
+            int da = manhattanDistance(a.first, a.second, ti, tj);
+            int db = manhattanDistance(b.first, b.second, ti, tj);
+            if (da != db) {
+                return da < db;
+            }
+            return a < b;
+        });
+        for (auto [nx, ny] : candidates) {
+            tryPlace(nx, ny, pi, pj, placements, true);
         }
     }
 
@@ -445,7 +474,7 @@ struct Solver {
                 if (board[nx][ny] == 'T') {
                     break;
                 }
-                if (tryPlace(nx, ny, pi, pj, placements)) {
+                if (tryPlace(nx, ny, pi, pj, placements, true)) {
                     break;
                 }
             }
@@ -680,6 +709,7 @@ struct Solver {
             preprocessInitial(pi, pj, placements);
             preprocessed = true;
         }
+        preventImmediateAdjacency(pi, pj, placements);
         handleAdjacentToFlower(pi, pj, placements);
         handleAdjacentSquares(pi, pj, placements);
 
