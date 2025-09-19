@@ -15,6 +15,7 @@ struct Solver {
     std::vector<std::string> initial;
     std::vector<std::string> board;
     std::vector<std::vector<bool>> confirmed;
+    bool preprocessed = false;
     const std::array<int, 4> dx{-1, 1, 0, 0};
     const std::array<int, 4> dy{0, 0, -1, 1};
 
@@ -33,6 +34,10 @@ struct Solver {
 
     bool inside(int x, int y) const {
         return 0 <= x && x < N && 0 <= y && y < N;
+    }
+
+    int manhattanDistance(int x1, int y1, int x2, int y2) const {
+        return std::abs(x1 - x2) + std::abs(y1 - y2);
     }
 
     bool maintainsConnectivity() const {
@@ -105,6 +110,57 @@ struct Solver {
         }
         placements.emplace_back(x, y);
         return true;
+    }
+
+    template <class Predicate>
+    std::vector<std::pair<int, int>> shortestPath(int sx, int sy, int gx, int gy, Predicate allow) const {
+        if (!inside(sx, sy) || !inside(gx, gy)) {
+            return {};
+        }
+        if (!allow(sx, sy) || !allow(gx, gy)) {
+            return {};
+        }
+        std::queue<std::pair<int, int>> q;
+        std::vector<std::vector<std::pair<int, int>>> parent(N, std::vector<std::pair<int, int>>(N, {-1, -1}));
+        parent[sx][sy] = {sx, sy};
+        q.emplace(sx, sy);
+        while (!q.empty()) {
+            auto [x, y] = q.front();
+            q.pop();
+            if (x == gx && y == gy) {
+                break;
+            }
+            for (int dir = 0; dir < 4; ++dir) {
+                int nx = x + dx[dir];
+                int ny = y + dy[dir];
+                if (!inside(nx, ny)) {
+                    continue;
+                }
+                if (!allow(nx, ny)) {
+                    continue;
+                }
+                if (parent[nx][ny].first != -1) {
+                    continue;
+                }
+                parent[nx][ny] = {x, y};
+                q.emplace(nx, ny);
+            }
+        }
+        if (parent[gx][gy].first == -1) {
+            return {};
+        }
+        std::vector<std::pair<int, int>> path;
+        int cx = gx;
+        int cy = gy;
+        while (!(cx == sx && cy == sy)) {
+            path.emplace_back(cx, cy);
+            auto [px, py] = parent[cx][cy];
+            cx = px;
+            cy = py;
+        }
+        path.emplace_back(sx, sy);
+        std::reverse(path.begin(), path.end());
+        return path;
     }
 
     bool frontConeClear(int dir, int dist, int pi, int pj) const {
@@ -328,8 +384,83 @@ struct Solver {
         }
     }
 
+    void preprocessInitial(int pi, int pj, std::vector<std::pair<int, int>> &placements) {
+        auto allowAll = [this](int x, int y) {
+            return board[x][y] == '.';
+        };
+        auto allowFar = [this](int x, int y) {
+            if (board[x][y] != '.') {
+                return false;
+            }
+            return manhattanDistance(x, y, ti, tj) >= 5;
+        };
+
+        int bottomRow = N - 1;
+        int bestJ = -1;
+        int bestDiff = N + 1;
+        std::vector<std::pair<int, int>> bestPathEntranceToBottom;
+        for (int j = 0; j < N; ++j) {
+            if (board[bottomRow][j] != '.') {
+                continue;
+            }
+            if (manhattanDistance(bottomRow, j, ti, tj) < 5) {
+                continue;
+            }
+            auto path = shortestPath(si, sj, bottomRow, j, allowFar);
+            if (path.empty()) {
+                continue;
+            }
+            int diff = std::abs(j - sj);
+            if (bestJ == -1 || diff < bestDiff || (diff == bestDiff && j < bestJ)) {
+                bestJ = j;
+                bestDiff = diff;
+                bestPathEntranceToBottom = std::move(path);
+            }
+        }
+        if (bestJ == -1) {
+            return;
+        }
+        auto pathStartToEntrance = shortestPath(0, 0, si, sj, allowAll);
+        if (pathStartToEntrance.empty()) {
+            return;
+        }
+        auto pathBottomToGoal = shortestPath(bottomRow, bestJ, bottomRow, N - 1, allowAll);
+        if (pathBottomToGoal.empty()) {
+            return;
+        }
+
+        std::vector<std::pair<int, int>> fullPath = pathStartToEntrance;
+        if (bestPathEntranceToBottom.size() > 1) {
+            fullPath.insert(fullPath.end(), bestPathEntranceToBottom.begin() + 1, bestPathEntranceToBottom.end());
+        }
+        if (pathBottomToGoal.size() > 1) {
+            fullPath.insert(fullPath.end(), pathBottomToGoal.begin() + 1, pathBottomToGoal.end());
+        }
+        std::vector<std::vector<bool>> onPath(N, std::vector<bool>(N, false));
+        for (auto [x, y] : fullPath) {
+            onPath[x][y] = true;
+        }
+        for (auto [vx, vy] : bestPathEntranceToBottom) {
+            for (int dir = 0; dir < 4; ++dir) {
+                int nx = vx + dx[dir];
+                int ny = vy + dy[dir];
+                if (!inside(nx, ny)) {
+                    continue;
+                }
+                if (onPath[nx][ny]) {
+                    continue;
+                }
+                tryPlace(nx, ny, pi, pj, placements);
+            }
+        }
+    }
+
     std::vector<std::pair<int, int>> planTurn(int pi, int pj) {
         std::vector<std::pair<int, int>> placements;
+        if (!preprocessed) {
+            preprocessInitial(pi, pj, placements);
+            preprocessed = true;
+        }
         handleAdjacentToFlower(pi, pj, placements);
 
         std::vector<int> availableDirs;
